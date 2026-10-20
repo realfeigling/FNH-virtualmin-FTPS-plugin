@@ -14,8 +14,11 @@ if (!-r '/etc/webmin/virtualmin-ftps/engine.json') {
     &ui_print_footer('/', 'Webmin');
     exit;
 }
-print '<p><a href="rotation.cgi">FTP-Logrotation einstellen</a></p>';
 my $id = $in{'dom'} || '';
+my $rotation_url = 'rotation.cgi'.($id =~ /^[0-9]{1,40}$/ ? '?dom='.$id : '');
+print '<p><a href="'.&html_escape($rotation_url).'">'.
+      ($id =~ /^[0-9]{1,40}$/ ? 'Logrotation für diese Domain einstellen' : 'FTP-Logrotation einstellen').
+      '</a></p>';
 if ($id eq '') {
     print '<p>Bitte zuerst in Virtualmin die gewünschte Domain auswählen und dort unter '.
           '&bdquo;Virtuellen Server verwalten&ldquo; den Eintrag &bdquo;FTPS prüfen&ldquo; öffnen. '.

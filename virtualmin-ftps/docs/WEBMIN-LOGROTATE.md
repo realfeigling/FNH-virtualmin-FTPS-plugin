@@ -31,3 +31,7 @@ Die ursprüngliche HTTP-Methode wird vor dem Laden weiterer Module gesichert. G�
 ## Korrektur 0.1.24 für Authentic Theme
 
 Genau ein POST-Formular vermeidet die Methodenverwechslung bei gleicher Formular-Zieladresse. „Anzeigen“ wechselt die Ansicht; Speichern betrifft immer den aktuell angezeigten Host. Nach Update den Menüeintrag frisch öffnen.
+
+## Domainbezogener Einstieg ab 0.1.25
+
+„FTPS prüfen → Logrotation für diese Domain einstellen“ öffnet ausschließlich die Einstellungen des gewählten Hosts. Eine Host-Auswahlliste wird dort nicht angezeigt. Der allgemeine Modul-Einstieg bleibt separat verfügbar.

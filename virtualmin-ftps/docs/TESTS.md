@@ -1,3 +1,3 @@
-# Prüfung 0.1.24 Beta
+# Prüfung 0.1.25 Beta
 
-Die bisherigen 98 Prüfungen plus drei Regressionstests für echte Formularstruktur und Methodenwahl des Authentic-Themes: genau ein POST-Formular mit allen Feldern, Hostwechsel ohne Speichern und kein versehentliches Umleiten einer Speicherung durch eine noch nicht angezeigte Dropdown-Auswahl.
+Zusätzlich zu den bisherigen 101 Tests: echte CGI-Ausgabe des Domain-Links und des allgemeinen Modul-Einstiegs, Domain-Seite ohne andere Hostnamen oder Host-Auswahl sowie weiterhin verfügbare globale Auswahl. Bisherige Formular-, Zugriffsschutz-, Rotations- und Paketprüfungen bleiben erhalten.

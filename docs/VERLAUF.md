@@ -90,3 +90,7 @@ Nutzer meldet POST-Fehler im Webmin-Formular. Ursprüngliche HTTP-Methode vor Mo
 ## 0.1.24 Beta – Ursache im AJAX-Formularablauf
 
 POST-Meldung besteht trotz gesicherter Methode weiter. Nutzer bestätigt unveränderte Browseradresse. Authentic-Quellcode get_pjax_type wählt bei stringförmiger Zieladresse die Methode des ersten passenden sichtbaren Formulars. Hostauswahl-GET und Speicher-POST hatten dasselbe Ziel. Umstellung auf genau ein POST-Formular, getrenntes Bearbeitungsziel und explizite reine Auswahlaktion. Neue HTML-/Transporttests.
+
+## 0.1.25 Beta – Domain-Kontext erhalten
+
+Nutzer wünscht aus „FTPS prüfen“ direkt nur die Logrotation dieser Domain. Link übergibt Domain-ID, Einstellungsseite blendet globale Auswahl im Domain-Kontext aus. Bestehende Domain-Regel mit 53 gegenüber 52 Standardarchiven bestätigt; keine Werte automatisch verändert.

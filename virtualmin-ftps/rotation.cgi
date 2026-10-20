@@ -30,7 +30,9 @@ if ($failure && !$reply) {
 }
 $main::force_charset = 'UTF-8';
 &ui_print_header(undef, 'FTP-Logrotation (Beta)', '', undef, 1, 1);
-my $html = '<div style="max-width:960px"><p>Gemeinsame Vorgaben oder einen einzelnen FTP-Host auswählen.</p>';
+my $html = '<div style="max-width:960px"><p>'.
+           ($scope ? 'Logrotation für die ausgewählte Domain.' :
+                     'Gemeinsame Vorgaben oder einen einzelnen FTP-Host auswählen.').'</p>';
 if ($failure) {
     $html .= '<p role="alert">'.&html_escape($failure).'</p>';
 }
@@ -39,6 +41,7 @@ if ($reply && (!$scope || $reply->{'domains'}->{$scope})) {
     $html .= &ui_form_start('rotation.cgi', 'post').
              &ui_hidden('dom', $scope).&ui_hidden('token', &ftps_rotation_token()).
              &ui_hidden('revision', $reply->{'revision'});
+    if (!$scope) {
     my @choices = (['', 'Gemeinsame Vorgaben für alle FTP-Hosts']);
     foreach my $id (sort { $reply->{'domains'}->{$a}->{'domain'} cmp
                           $reply->{'domains'}->{$b}->{'domain'} } keys %{$reply->{'domains'}}) {
@@ -46,6 +49,7 @@ if ($reply && (!$scope || $reply->{'domains'}->{$scope})) {
     }
     $html .= &ui_select('host', $scope, \@choices).
              &ui_submit('Anzeigen', 'show');
+    }
     my ($policy, $inherit) = &ftps_rotation_policy($reply, $scope);
     if ($action && $action eq 'preview') {
         $inherit = $scope && $in{'inherit'} ? 1 : 0;

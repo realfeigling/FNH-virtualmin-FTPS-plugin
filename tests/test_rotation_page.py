@@ -17,7 +17,7 @@ require '__HELPER__';
 *main::ftps_rotation_backend=sub {
     my($request)=@_;
     if ($request->{operation} ne 'read') {$writes++ if $request->{operation} eq 'save';return {saved=>$request->{operation} eq 'save'?1:0};}
-    return {rotation=>{},domains=>{'1'=>{domain=>'one.example<script>'}},revision=>'revision',installed=>1};
+    return {rotation=>{},domains=>{'1'=>{domain=>'one.example<script>'},'2'=>{domain=>'other.example'}},revision=>'revision',installed=>1};
 };
 sub ReadParse {%in=%{decode_json(do {local $/;<STDIN>})};}
 sub html_escape {my($s)=@_;$s='' if !defined($s);$s=~s/&/&amp;/g;$s=~s/</&lt;/g;$s=~s/>/&gt;/g;$s=~s/"/&quot;/g;return $s;}
@@ -112,3 +112,18 @@ class RotationPage(unittest.TestCase):
         self.assertNotIn('Zeitplan für one.example',html)
         self.assertIn('name="dom" value=""',html)
         self.assertIn('data-writes="1"',html)
+
+    def test_domain_page_shows_only_selected_host_settings(self):
+        html=self.page(dom='1')
+        self.assertIn('Zeitplan für one.example&lt;script&gt;',html)
+        self.assertIn('name="inherit"',html)
+        self.assertNotIn('name="host"',html)
+        self.assertNotIn('name="show"',html)
+        self.assertNotIn('other.example',html)
+        self.assertNotIn('Gemeinsame Vorgaben oder einen einzelnen FTP-Host auswählen',html)
+        self.assertEqual(html.count('<form '),1)
+
+    def test_global_page_still_offers_host_selection(self):
+        html=self.page()
+        self.assertIn('name="host"',html)
+        self.assertIn('other.example',html)

@@ -1,6 +1,6 @@
 desc=Virtualmin FTPS VirtualHosts (Beta)
 category=servers
-version=0.1.24
+version=0.1.25
 depends=virtual-server proftpd
 os_support=debian-linux
 readonly=0
