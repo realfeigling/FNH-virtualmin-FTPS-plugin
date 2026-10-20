@@ -36,4 +36,44 @@ class LogMenu(unittest.TestCase):
         r=self.result()['acl'][0]
         self.assertEqual(r[0],'virtualmin-ftps')
         self.assertEqual(r[1],{'logs':1,'doms':'1 2','noconfig':1})
+    def test_refresh_updates_only_ftps_module_for_actual_owners(self):
+        program=r"""
+use JSON::PP;
+our (@added,%saved,$cleared);
+sub ftps_load_virtualmin {}
+sub virtual_server::require_acl {}
+sub acl::list_users { return ({name=>'ownerA'},{name=>'ownerB'}); }
+our %domains=(
+  1=>{id=>'1',user=>'ownerA',webmin=>1,'virtualmin-ftps'=>1},
+  2=>{id=>'2',user=>'ownerA',parent=>'1','virtualmin-ftps'=>1},
+  3=>{id=>'3',user=>'ownerB',webmin=>1,'virtualmin-ftps'=>1},
+  4=>{id=>'4',user=>'ownerB',webmin=>1,'virtualmin-ftps'=>0});
+sub virtual_server::list_domains {return values %domains;}
+sub virtual_server::get_domain {return $domains{$_[0]};}
+sub virtual_server::add_user_module_acl {push(@added, [@_]);}
+sub virtual_server::clear_links_cache {$cleared++;}
+sub save_module_acl {my($acl,$user,$mod)=@_;$saved{$user}={mod=>$mod,acl=>$acl};}
+my $src;{local $/;open(my $fh,'<',$ARGV[0]) or die $!;$src=<$fh>;}
+$src=~/(sub ftps_refresh_log_access\b.*?)(?=sub ftps_refresh_menu)/s or die 'refresh missing';
+eval $1;die $@ if $@;
+ftps_refresh_log_access();
+print encode_json({added=>\@added,saved=>\%saved,cleared=>$cleared});
+"""
+        p=subprocess.run(['perl','-e',program,str(ROOT/'virtualmin-ftps/virtualmin-ftps-lib.pl')],
+                         capture_output=True,text=True)
+        self.assertEqual(p.returncode,0,p.stderr);r=json.loads(p.stdout)
+        self.assertEqual(r['saved']['ownerA']['acl']['doms'],'1 2')
+        self.assertEqual(r['saved']['ownerB']['acl']['doms'],'3')
+        self.assertEqual({x[1] for x in r['added']},{'virtualmin-ftps'})
+        self.assertEqual(r['cleared'],1)
+
+    def test_plugin_library_syntax_with_webmin_import_stub(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            Path(temp,'WebminCore.pm').write_text('package WebminCore; sub import {} 1;')
+            p=subprocess.run(['perl','-I'+temp,'-c',
+                              str(ROOT/'virtualmin-ftps/virtualmin-ftps-lib.pl')],
+                             capture_output=True,text=True)
+            self.assertEqual(p.returncode,0,p.stderr)
+
 if __name__=='__main__':unittest.main()

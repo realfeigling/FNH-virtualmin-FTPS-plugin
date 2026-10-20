@@ -1,5 +1,7 @@
 # Prüfung 0.1.17 Beta
 
+53 Testmethoden eingerichtet; darunter eine echte Linux-Bind-Einhängung, Lesen unter chroot/Domain-UID und das fortlaufende Schreiben in das root-eigene Original. Die Modulbibliothek wird zusätzlich mit einem reinen WebminCore-Importstub auf Perl-Syntax geprüft; ihr vollständiger Webmin-Lauf bleibt ungetestet.
+
 Zusätzlich zu den 30 bisherigen Datei-/Migrations-/Descriptor-/Paketprüfungen sind Tests für echte schreibgeschützte Bind-Mounts, Lesbarkeit innerhalb eines tatsächlichen Chroots unter Domain-UID/GID, verweigerte Lösch-/Schreibzugriffe, Unmount mit Erhalt der Originale, Vorschau ohne Mountpoint-Anlage, fremde Mounts, begrenzte Lese-API, Domain-/Modul-ACL-Abweisung vor dem Backend, HTML-Escaping sowie native Menülinks und feature_webmin-ACLs eingerichtet. Originale liegen außerhalb von /var/log; die alten automatischen Pfade werden gezielt umgestellt.
 
 Die Linux-Mount-/Chroot-Prüfungen laufen isoliert im CI. Virtualmin-Umgebung, ProFTPD-Syntaxprüfung und Reload sind weiterhin simuliert. Kein Browser-Theme-Test und keine Live-Abnahme des Zielservers. Ergebnisse siehe GitHub Actions.

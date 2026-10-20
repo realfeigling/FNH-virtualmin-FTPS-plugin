@@ -1,6 +1,7 @@
 import sys
 import importlib.util
 import os
+import errno
 from pathlib import Path
 import subprocess
 import tempfile
@@ -27,6 +28,8 @@ class BindViews(unittest.TestCase):
         d = self.view()
         prepare_views({'1':d})
         self.addCleanup(lambda: unmount_view(d))
+        with f.open('a') as writer:
+            writer.write(' live FTP event')
         entry = mount_entry(d['log_view'])
         self.assertTrue({'ro','nosuid','nodev','noexec'} <= entry)
         script = '''import os,sys
@@ -34,18 +37,19 @@ from pathlib import Path
 os.chroot(sys.argv[1]); os.chdir('/')
 os.setgroups([int(sys.argv[3])]);os.setgid(int(sys.argv[3]));os.setuid(int(sys.argv[2]))
 p=Path('/logs/ftps/ftp.log')
-assert p.read_text()=='protected log record'
+assert p.read_text()=='protected log record live FTP event'
 for op in (lambda:p.unlink(),lambda:p.rename(p.with_name('gone')),
            lambda:p.write_text('overwrite')):
     try:op()
-    except PermissionError:pass
+    except OSError as err:
+        assert err.errno in (1,13,30), str(err)
     else:raise SystemExit('write/delete succeeded')
 '''
         result=subprocess.run([sys.executable,'-c',script,str(self.home),
                                str(self.user.pw_uid),str(self.user.pw_gid)],
                               capture_output=True,text=True,cwd='/')
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-        self.assertEqual(f.read_text(),'protected log record')
+        self.assertEqual(f.read_text(),'protected log record live FTP event')
         self.assertEqual(prepare_views({'1':d}),[])
 
     def test_unmount_preserves_protected_originals(self):
@@ -57,6 +61,17 @@ for op in (lambda:p.unlink(),lambda:p.rename(p.with_name('gone')),
         unmount_view(d)
         self.assertIsNone(mount_entry(d['log_view']))
         self.assertEqual((self.path/'ftp.log').read_text(),'preserve')
+
+    def test_relocated_view_is_safely_unmounted(self):
+        self.prepare()
+        d=self.view();prepare_views({'1':d})
+        self.addCleanup(lambda:unmount_view(d))
+        moved=self.home/'renamed-logs'
+        (self.home/'logs').rename(moved)
+        self.assertIsNotNone(mount_entry(str(moved/'ftps')))
+        unmount_view(d)
+        self.assertIsNone(mount_entry(str(moved/'ftps')))
+        self.assertTrue((self.path/'ftp.log').exists())
 
     def test_preview_does_not_create_customer_view(self):
         self.prepare()

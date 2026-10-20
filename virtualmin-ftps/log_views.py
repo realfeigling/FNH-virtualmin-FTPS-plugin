@@ -34,7 +34,7 @@ def open_directory(path):
         raise
 
 
-def unmount_fd(fd, detach=False):
+def unmount_fd(fd, detach=True):
     if LIBC.umount2(('/proc/self/fd/' + str(fd)).encode(), 2 if detach else 0) < 0:
         err = ctypes.get_errno()
         raise OSError(err, os.strerror(err))
@@ -42,18 +42,31 @@ def unmount_fd(fd, detach=False):
 
 def unmount_view(d):
     target, source = d.get('log_view'), d.get('log_dir')
-    if not target or not source or mount_entry(target) is None:
+    if not target or not source:
         return
     if target != str(Path(d['home']) / 'logs/ftps'):
         raise ValueError('Unexpected FTP log mount path')
-    fd = open_directory(target)
-    try:
-        a, b = os.stat(source), os.fstat(fd)
-        if (a.st_dev, a.st_ino) != (b.st_dev, b.st_ino):
-            raise ValueError('Refusing to unmount foreign filesystem')
-        unmount_fd(fd)
-    finally:
-        os.close(fd)
+    a = os.stat(source)
+    candidates = {target} if mount_entry(target) is not None else set()
+    # Identify relocated views by protected source inode, not by a user path.
+    for line in Path('/proc/self/mountinfo').read_text().splitlines():
+        fields = line.split(' - ', 1)[0].split()
+        if len(fields) > 5 and fields[4].startswith(d['home'] + '/'):
+            candidates.add(fields[4])
+    for candidate in sorted(candidates, key=len, reverse=True):
+        try:
+            fd = open_directory(candidate)
+        except FileNotFoundError:
+            continue
+        try:
+            b = os.fstat(fd)
+            if (a.st_dev, a.st_ino) != (b.st_dev, b.st_ino):
+                if candidate == target:
+                    raise ValueError('Refusing to unmount foreign filesystem')
+                continue
+            unmount_fd(fd)
+        finally:
+            os.close(fd)
 
 
 def readonly_bind(source, target_fd, target):
@@ -108,6 +121,8 @@ def prepare_views(domains, apply=True):
                 continue
             if target != str(Path(d['home']) / 'logs/ftps'):
                 raise ValueError('Unexpected customer log view path')
+            if apply and mount_entry(target) is None:
+                unmount_view(d)
             home_fd = open_directory(d['home'])
             logs_fd = target_fd = None
             try:
