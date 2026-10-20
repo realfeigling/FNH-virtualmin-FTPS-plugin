@@ -35,7 +35,7 @@ print encode_json($result);
 class VirtualminDescriptor(unittest.TestCase):
     def domain(self):
         return dict(id='1', dom='one.example', ip='192.0.2.1',
-                    group='domain', dir=1, home='/data/www/pages/u607101601')
+                    group='domain', user='customer', dir=1, home='/data/www/pages/u607101601')
 
     def descriptor(self, domain):
         return subprocess.run(
@@ -52,6 +52,7 @@ class VirtualminDescriptor(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 desc = json.loads(result.stdout)
                 self.assertEqual(desc['home'], home)
+                self.assertEqual(desc['user'], 'customer')
                 normalized = engine.normalize(desc)
                 self.assertEqual(engine.log_paths(normalized),
                                  (home + '/logs/ftp.log', home + '/logs/xferlog'))

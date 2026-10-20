@@ -44,3 +44,7 @@ Die Nutzerausgabe zeigte: gespeicherter Server-FQDN fehlt, aktive Datei enthält
 ## Korrektur der Virtualmin-Feldzuordnung, 0.1.13 Beta
 
 Die Nutzerausgabe zeigte dir=1 bei allen Domains. Die Plugin-Zuordnung von dir zum Home-Pfad war falsch. Sie verwendet jetzt home; der dir-Wert bleibt Aktivierungsmerkmal. Drei neue Tests prüfen die echte Perl-Descriptor-Funktion und ihre Übergabe an Python. Keine Änderung an Live-Domainfeldern oder Home-Verzeichnissen beim Paketbau.
+
+## Log-Eigentümer und Kundenregeln, 0.1.14 Beta
+
+Der Nutzer stellte klar, dass Logs den Domain-Benutzern und ihren Gruppen gehören. Die bisherige root-Anforderung war falsch. Das Plugin übernimmt jetzt user und group aus Virtualmin, akzeptiert passende vorhandene Logs unverändert und legt neue Logs entsprechend an. Root-eigene Altlogs mit passender Gruppe werden ohne Leeren übertragen. Außerdem wurde auf ausdrücklichen Wunsch AllowOverride on gesetzt; AllowOverwrite on bleibt aktiv. Neue Regressionstests bilden die gemeldeten Werte UID 1015/GID 1018/0644 ab. Keine Live-Serveränderung beim Paketbau.

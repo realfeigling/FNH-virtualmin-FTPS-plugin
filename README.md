@@ -1,12 +1,12 @@
 # FNH Virtualmin FTPS Plugin — Beta
 
-Version **0.1.13 Beta** für Virtualmin/Webmin und ProFTPD.
+Version **0.1.14 Beta** für Virtualmin/Webmin und ProFTPD.
 
 ## Download
 
-- [Installierbares Webmin-Paket](releases/0.1.13/virtualmin-ftps-0.1.13.wbm.gz)
-- [SHA-256-Prüfsumme](releases/0.1.13/virtualmin-ftps-0.1.13.wbm.gz.sha256)
-- [Änderungsübersicht](releases/0.1.13/AENDERUNGEN-0.1.13.md)
+- [Installierbares Webmin-Paket](releases/0.1.14/virtualmin-ftps-0.1.14.wbm.gz)
+- [SHA-256-Prüfsumme](releases/0.1.14/virtualmin-ftps-0.1.14.wbm.gz.sha256)
+- [Änderungsübersicht](releases/0.1.14/AENDERUNGEN-0.1.14.md)
 
 Das .wbm.gz-Paket über Webmin installieren. Ein bereits aktiver Abgleich-Timer kann nach Installation die neue ServerIdent-Begrüßung übernehmen. Keine erneute Einrichtung oder Aktivierung ohne Prüfung der bestehenden Installation.
 
@@ -25,6 +25,10 @@ Die ausdrückliche Migration akzeptiert eine exakt bekannte Datei mit lokalem Se
 ## Korrektur der Home-Pfade
 
 Der tatsächliche Home-Pfad kommt aus Virtualmins home-Feld. Das dir-Feld ist ausschließlich ein Aktivierungsmerkmal. [Updatehinweise](virtualmin-ftps/docs/HOME-MAPPING.md).
+
+## Domain-Eigentümer und Kundenregeln
+
+Logs verwenden Domain-Benutzer und Domain-Gruppe. AllowOverride on erlaubt .ftpaccess-Dateien; AllowOverwrite on erlaubt das Überschreiben mit den bestehenden Unix-Rechten. [Updatehinweise](virtualmin-ftps/docs/OWNERSHIP-UPDATE.md).
 
 ## Dokumentation
 

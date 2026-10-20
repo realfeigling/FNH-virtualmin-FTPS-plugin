@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import grp
+import pwd
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('ftps_engine', ROOT / 'virtualmin-ftps/engine.py')
@@ -20,9 +21,10 @@ class DomainLogs(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.home = self.root / 'domain'
         self.home.mkdir()
-        self.group = grp.getgrgid(os.getgid()).gr_name
+        self.user = pwd.getpwnam('nobody')
+        self.group = grp.getgrgid(self.user.pw_gid).gr_name
         self.d = dict(id='1', dom='one.example', ip='192.0.2.1',
-                      group=self.group, home=str(self.home), cert='/cert', key='/key',
+                      group=self.group, user=self.user.pw_name, home=str(self.home), cert='/cert', key='/key',
                       suspended=False, kind='RSA', fingerprint='same', has_ca=False,
                       certificate_source='website')
         self.c = dict(state_dir=str(self.root), managed_file=str(self.root / 'managed'),
@@ -59,6 +61,7 @@ class DomainLogs(unittest.TestCase):
             self.assertIn('TransferLog ' + d['home'] + '/logs/xferlog\n', block)
         self.assertEqual(data.count('ServerIdent on "server.example"'), 2)
         self.assertEqual(data.count('AllowOverwrite on\n'), 2)
+        self.assertEqual(data.count('AllowOverride on\n'), 2)
         self.assertIn('ServerName "one.example"', data)
 
     def test_invalid_home(self):
@@ -79,7 +82,8 @@ class DomainLogs(unittest.TestCase):
             p = self.home / 'logs' / name
             self.assertTrue(p.is_file())
             self.assertEqual(p.stat().st_mode & 0o777, 0o640)
-            self.assertEqual(p.stat().st_uid, 0)
+            self.assertEqual(p.stat().st_uid, self.user.pw_uid)
+            self.assertEqual(p.stat().st_gid, self.user.pw_gid)
             p.write_text('existing records\n')
         e.prepare_logs({'1': self.d})
         self.assertEqual((self.home / 'logs/ftp.log').read_text(), 'existing records\n')
@@ -122,9 +126,9 @@ class DomainLogs(unittest.TestCase):
         with self.assertRaises(ValueError):
             e.prepare_logs({'1': self.d})
 
-    def test_group_writable_file_rejected(self):
+    def test_world_writable_file_rejected(self):
         e.prepare_logs({'1': self.d})
-        (self.home / 'logs/ftp.log').chmod(0o660)
+        (self.home / 'logs/ftp.log').chmod(0o666)
         with self.assertRaises(ValueError):
             e.prepare_logs({'1': self.d})
 
@@ -191,7 +195,7 @@ class DomainLogs(unittest.TestCase):
         state.pop('server_fqdn')
         (self.root / 'state.json').write_text(json.dumps(state))
         self.engine.managed.write_bytes(e.render(
-            state['domains'], self.c, identity=identity, allow_overwrite=False))
+            state['domains'], self.c, identity=identity, allow_overwrite=False, allow_override=False))
         return state
 
     def test_legacy_server_greeting_without_state_migrates(self):
@@ -229,6 +233,103 @@ class DomainLogs(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'drift'):
             self.execute(False, operation='use-website-certificates')
         self.assertEqual(self.engine.managed.read_bytes(), before)
+
+    def test_reported_uid_1015_gid_1018_0644_preserved(self):
+        from types import SimpleNamespace
+        import pwd
+        (self.home / 'logs').mkdir()
+        for name in ('ftp.log', 'xferlog'):
+            f = self.home / 'logs' / name
+            f.write_text('existing customer records')
+            os.chown(f, 1015, 1018)
+            f.chmod(0o644)
+        with patch.object(pwd, 'getpwnam', return_value=SimpleNamespace(pw_uid=1015)), \
+             patch.object(grp, 'getgrnam', return_value=SimpleNamespace(gr_gid=1018)):
+            e.prepare_logs({'1': self.d})
+        for name in ('ftp.log', 'xferlog'):
+            f = self.home / 'logs' / name
+            self.assertEqual((f.stat().st_uid, f.stat().st_gid), (1015, 1018))
+            self.assertEqual(f.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(f.read_text(), 'existing customer records')
+
+    def test_domain_group_write_accepted(self):
+        e.prepare_logs({'1': self.d})
+        f = self.home / 'logs/ftp.log'
+        f.chmod(0o664)
+        e.prepare_logs({'1': self.d})
+        self.assertEqual(f.stat().st_mode & 0o777, 0o664)
+
+    def test_root_owned_legacy_logs_migrate_without_truncation(self):
+        logs = self.home / 'logs'
+        logs.mkdir()
+        os.chown(logs, 0, self.user.pw_gid)
+        for name in ('ftp.log', 'xferlog'):
+            f = logs / name
+            f.write_text('keep root-created records')
+            os.chown(f, 0, self.user.pw_gid)
+            f.chmod(0o644)
+        e.prepare_logs({'1': self.d})
+        self.assertEqual(logs.stat().st_uid, self.user.pw_uid)
+        for name in ('ftp.log', 'xferlog'):
+            f = logs / name
+            self.assertEqual((f.stat().st_uid, f.stat().st_gid),
+                             (self.user.pw_uid, self.user.pw_gid))
+            self.assertEqual(f.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(f.read_text(), 'keep root-created records')
+
+    def test_foreign_log_user_refused_with_path(self):
+        e.prepare_logs({'1': self.d})
+        f = self.home / 'logs/ftp.log'
+        f.write_text('preserve')
+        os.chown(f, 12345, self.user.pw_gid)
+        with self.assertRaisesRegex(ValueError, 'ftp.log.*uid=12345'):
+            e.prepare_logs({'1': self.d})
+        self.assertEqual(f.stat().st_uid, 12345)
+        self.assertEqual(f.read_text(), 'preserve')
+
+    def test_foreign_log_group_refused(self):
+        e.prepare_logs({'1': self.d})
+        f = self.home / 'logs/ftp.log'
+        os.chown(f, self.user.pw_uid, 12345)
+        with self.assertRaisesRegex(ValueError, 'gid=12345'):
+            e.prepare_logs({'1': self.d})
+        self.assertEqual(f.stat().st_gid, 12345)
+
+    def test_missing_user_rejected(self):
+        d = dict(self.d)
+        d.pop('user')
+        with self.assertRaisesRegex(ValueError, 'domain user'):
+            e.prepare_logs({'1': d})
+
+    def test_013_override_off_state_migrates(self):
+        old = self.state()
+        old['domains']['1'].pop('user')
+        old['allow_overwrite'] = True
+        (self.root / 'state.json').write_text(json.dumps(old))
+        self.engine.managed.write_bytes(e.render_state(old, self.c))
+        self.assertIn(b'AllowOverride off', self.engine.managed.read_bytes())
+        before = self.engine.managed.read_bytes()
+        self.assertTrue(self.execute(False)['changed'])
+        self.assertEqual(self.engine.managed.read_bytes(), before)
+        self.assertTrue(self.execute(True)['applied'])
+        current = self.engine.managed.read_bytes()
+        self.assertIn(b'AllowOverride on', current)
+        self.assertIn(b'AllowOverwrite on', current)
+        state = e.load_json(self.root / 'state.json')
+        self.assertTrue(state['allow_override'])
+        self.assertEqual(state['domains']['1']['user'], self.user.pw_name)
+        self.assertFalse(self.execute(True)['changed'])
+
+    def test_preview_preserves_root_owned_files(self):
+        self.state()
+        logs = self.home / 'logs'
+        logs.mkdir()
+        f = logs / 'ftp.log'
+        f.write_text('preserve')
+        os.chown(f, 0, self.user.pw_gid)
+        self.execute(False)
+        self.assertEqual(f.stat().st_uid, 0)
+        self.assertEqual(f.read_text(), 'preserve')
 
     def test_reload_failure_restores_config_and_state(self):
         old = self.state(legacy=True)

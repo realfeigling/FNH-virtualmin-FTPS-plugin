@@ -184,7 +184,7 @@ def scan(conf, managed):
 
 
 def normalize(d):
-    allowed = {'id', 'dom', 'ip', 'ip6', 'group', 'cert', 'key', 'ca', 'suspended', 'home'}
+    allowed = {'id', 'dom', 'ip', 'ip6', 'group', 'cert', 'key', 'ca', 'suspended', 'home', 'user'}
     if set(d) - allowed:
         raise ValueError('Unknown domain descriptor fields')
     d = dict(d)
@@ -212,6 +212,8 @@ def normalize(d):
     for k in ('cert', 'key', 'ca'):
         if d.get(k) and (not re.fullmatch(r'/[A-Za-z0-9_./-]+', str(d[k]))):
             raise ValueError('Certificate paths must be absolute')
+    if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]{0,63}', d.get('user', '')):
+        raise ValueError('Missing or invalid Virtualmin domain user; run a full domain collection')
     d['home'] = validate_home(d.get('home'))
     d['suspended'] = bool(d.get('suspended'))
     return d
@@ -356,6 +358,7 @@ def prepare_logs(domains):
     be renamed by their owners, so its own log protections must stay enabled.
     """
     import grp
+    import pwd
     seen = {}
     for d in domains.values():
         if not d.get('home'):
@@ -364,6 +367,9 @@ def prepare_logs(domains):
         if home in seen and seen[home] != d['id']:
             raise ValueError('Multiple FTPS hosts share the same log directory')
         seen[home] = d['id']
+        if not d.get('user'):
+            raise ValueError(f'Missing domain user for {d["dom"]}; run a full domain collection')
+        uid = pwd.getpwnam(d['user']).pw_uid
         gid = grp.getgrnam(d['group']).gr_gid
         fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
         try:
@@ -383,10 +389,13 @@ def prepare_logs(domains):
                            dir_fd=fd)
             try:
                 if created_dir:
-                    os.fchown(logs, 0, gid)
+                    os.fchown(logs, uid, gid)
                     os.fchmod(logs, 0o750)
-                if os.fstat(logs).st_mode & 0o002:
+                directory = os.fstat(logs)
+                if directory.st_mode & 0o002:
                     raise ValueError('World-writable log directory')
+                if directory.st_uid == 0 and directory.st_gid == gid and not created_dir:
+                    os.fchown(logs, uid, gid)
                 for name in ('ftp.log', 'xferlog'):
                     try:
                         f = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
@@ -397,13 +406,23 @@ def prepare_logs(domains):
                                     dir_fd=logs)
                         created = False
                     try:
-                        if created:
-                            os.fchown(f, 0, gid)
-                            os.fchmod(f, 0o640)
                         st = os.fstat(f)
                         if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or
-                                st.st_uid != 0 or st.st_mode & 0o022):
-                            raise ValueError('Unsafe existing FTPS log file; review ownership and permissions')
+                                (not created and (st.st_uid not in (0, uid) or
+                                                  st.st_gid != gid)) or
+                                st.st_mode & 0o002):
+                            raise ValueError(
+                                f'Unsafe FTPS log {home}/logs/{name}: '
+                                f'uid={st.st_uid}, gid={st.st_gid}, '
+                                f'mode={stat.S_IMODE(st.st_mode):04o}, links={st.st_nlink}; '
+                                f'expected user {d["user"]} ({uid}) and group {d["group"]} ({gid}), '
+                                'regular single-link file without world-write access')
+                        # Preserve existing domain-owned files and their modes.
+                        # Migrate root-owned logs created by older plugin versions.
+                        if created or st.st_uid == 0:
+                            os.fchown(f, uid, gid)
+                        if created:
+                            os.fchmod(f, 0o640)
                     finally:
                         os.close(f)
             finally:
@@ -432,11 +451,12 @@ def render_state(state, c, legacy_login=False):
     return render(state['domains'], c, legacy_login=legacy_login,
                   legacy_ident='server_fqdn' not in state,
                   identity=state.get('server_fqdn'),
-                  allow_overwrite=state.get('allow_overwrite', False))
+                  allow_overwrite=state.get('allow_overwrite', False),
+                  allow_override=state.get('allow_override', False))
 
 
 def render(domains, c, legacy_login=False, legacy_ident=False, identity=None,
-           allow_overwrite=True):
+           allow_overwrite=True, allow_override=True):
     default = validate_default_domain(c.get('default_domain', ''))
     identity = identity if identity is not None else (None if legacy_ident or not domains else server_fqdn())
     out = [HEADER]
@@ -452,7 +472,7 @@ def render(domains, c, legacy_login=False, legacy_ident=False, identity=None,
         out += [f'# Domain ID {ident}\n<VirtualHost {ips}>\n',
                 f'ServerName "{d["dom"]}"\nServerAlias {d["dom"]}\n'
                 f'ServerIdent on "{d["dom"] if legacy_ident else identity}"\nDefaultServer {"on" if d["dom"] == default else "off"}\nPort 21\n',
-                'DefaultRoot ~\nAllowOverride off\n' +
+                f'DefaultRoot ~\nAllowOverride {"on" if allow_override else "off"}\n' +
                 ('AllowOverwrite on\n' if allow_overwrite else ''),
                 f'PassivePorts {c["passive_ports"][0]} {c["passive_ports"][1]}\n',
                 'TLSEngine on\nTLSRequired on\nTLSProtocol TLSv1.2 TLSv1.3\nTLSVerifyClient off\n',
@@ -655,7 +675,7 @@ class Engine:
                 raise ValueError('Managed configuration drift; repair refuses foreign changes')
             changed = current != corrected
             if apply and changed:
-                updated = dict(state, server_fqdn=identity, allow_overwrite=True)
+                updated = dict(state, server_fqdn=identity, allow_overwrite=True, allow_override=True)
                 self.commit(updated, corrected, expected_current=current)
             elif not apply:
                 self.validate_config(corrected)
@@ -674,7 +694,8 @@ class Engine:
                 accepted.extend(render(
                     state['domains'], self.c, legacy_login=legacy_login,
                     identity=identity,
-                    allow_overwrite=state.get('allow_overwrite', False))
+                    allow_overwrite=state.get('allow_overwrite', False),
+                    allow_override=state.get('allow_override', False))
                     for legacy_login in (False, True))
             if current not in accepted:
                 raise ValueError('Managed configuration drift; migration refuses foreign changes')
@@ -739,7 +760,7 @@ class Engine:
                 item = dict(d, kind=kind, fingerprint=fingerprint, has_ca=has_ca,
                             certificate_source='website')
                 if old != item:
-                    public_keys = ('dom', 'ip', 'ip6', 'group', 'suspended', 'kind', 'certificate_source', 'home')
+                    public_keys = ('dom', 'ip', 'ip6', 'group', 'suspended', 'kind', 'certificate_source', 'home', 'user')
                     changes.append({'id': d['id'], 'domain': d['dom'], 'kind': kind,
                                     'before': {k: old.get(k) for k in public_keys},
                                     'after': {k: item.get(k) for k in public_keys}})
@@ -753,7 +774,7 @@ class Engine:
                 raise ValueError('; '.join(warnings))
             identity = server_fqdn() if domains else state.get('server_fqdn')
             data = render(domains, self.c, identity=identity)
-            newstate = {'domains': domains, 'pending': pending, 'allow_overwrite': True}
+            newstate = {'domains': domains, 'pending': pending, 'allow_overwrite': True, 'allow_override': True}
             if identity is not None:
                 newstate['server_fqdn'] = identity
             if 'last_lifecycle' in state:

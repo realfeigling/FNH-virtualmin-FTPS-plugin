@@ -1,3 +1,9 @@
+# Prüfung 0.1.14 Beta
+
+35 automatisierte Tests: 28 Domain-/Migrationsfälle, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Archivprüfungen. Neue Fälle prüfen UID 1015/GID 1018 mit 0644 unverändert, Neuanlage mit echter nicht-root-Domain-Identität, zulässige Gruppen-Schreibrechte, Migration root-eigener Altlogs ohne Leeren, fremde Eigentümer/Gruppen mit konkreten Fehlermeldungen, fehlende Benutzerangaben, Vorschau ohne chown und Übernahme von AllowOverride off nach on. AllowOverwrite on bleibt je Host geprüft.
+
+Die Datei- und Eigentümerprüfungen laufen unter Linux im CI als root, mit echten fchown-/Dateisystemoperationen an isolierten Testdateien. Virtualmin-SSL-Aufrufe, ProFTPD-Syntaxprüfung und systemd-Reload bleiben simuliert. Kein echter Webmin-/FTPS-Livetest. Paketmanifest, Archivprüfsumme, Berechtigungen und Bytegleichheit der Paketdateien zum Quellstand werden geprüft. Ergebnisse siehe GitHub Actions.
+
 # Prüfung 0.1.13 Beta
 
 27 automatisierte Tests eingerichtet: 20 Domain-/Migrationsprüfungen, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Paketprüfungen. Neue Fälle: Virtualmin dir=1 mit tatsächlichem home, Subserver-Pfad, fehlendes home und deaktivierte Verzeichnisfunktion. Die echte Plugin-Descriptor-Funktion wird aus der Quelldatei ausgeführt; Virtualmin-SSL-Aufrufe sind simuliert. Python-Syntax und vier Perl-Syntaxprüfungen sind Teil der GitHub-Actions-Prüfung.
