@@ -1,3 +1,9 @@
+# Prüfung 0.1.13 Beta
+
+27 automatisierte Tests eingerichtet: 20 Domain-/Migrationsprüfungen, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Paketprüfungen. Neue Fälle: Virtualmin dir=1 mit tatsächlichem home, Subserver-Pfad, fehlendes home und deaktivierte Verzeichnisfunktion. Die echte Plugin-Descriptor-Funktion wird aus der Quelldatei ausgeführt; Virtualmin-SSL-Aufrufe sind simuliert. Python-Syntax und vier Perl-Syntaxprüfungen sind Teil der GitHub-Actions-Prüfung.
+
+ProFTPD und Reload in den Transaktionstests simuliert. Kein echter Webmin-Lauf und keine Live-Serveränderung. Ausführungsergebnisse siehe GitHub Actions.
+
 # Prüfung 0.1.12 Beta
 
 20 Domain-/Migrations-Regressionstests und 4 Paketprüfungen sind eingerichtet. Drei neue Fälle prüfen die exakte Befundkonstellation (Server-Begrüßung bereits geändert, server_fqdn fehlt), Vorschau ohne Änderung, erfolgreiche Anwendung mit Zustand/Logs/AllowOverwrite, Wiederholbarkeit sowie Ablehnung veränderter Ports oder fremder Begrüßungsnamen. Ausführung und Ergebnisse: GitHub Actions. ProFTPD und Reload werden in den Transaktionstests simuliert; keine Live-Abnahme.

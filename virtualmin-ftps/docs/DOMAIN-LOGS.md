@@ -1,6 +1,6 @@
 # Domainbezogene FTP-Logs — 0.1.10 Beta
 
-Jeder vom Plugin verwaltete VirtualHost erhält die Logpfade aus dem von Virtualmin gelieferten Domain-Home-Verzeichnis (`dir`), nicht aus einem fest codierten Benutzerpfad.
+Jeder vom Plugin verwaltete VirtualHost erhält die Logpfade aus dem von Virtualmin gelieferten Domain-Home-Verzeichnis (`home`; `dir` ist das Aktivierungsmerkmal), nicht aus einem fest codierten Benutzerpfad.
 
 Beispiel für das Home-Verzeichnis /data/www/pages/u607101601:
 

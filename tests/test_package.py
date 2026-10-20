@@ -4,7 +4,7 @@ import tarfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-ARCHIVE = ROOT / 'releases/0.1.12/virtualmin-ftps-0.1.12.wbm.gz'
+ARCHIVE = ROOT / 'releases/0.1.13/virtualmin-ftps-0.1.13.wbm.gz'
 
 
 class Package(unittest.TestCase):
@@ -25,7 +25,7 @@ class Package(unittest.TestCase):
                 if info.name.endswith(('.py', '.pl', '.cgi')):
                     self.assertEqual(info.mode, 0o755)
             info = archive.extractfile('virtualmin-ftps/module.info').read()
-            self.assertIn(b'version=0.1.12', info)
+            self.assertIn(b'version=0.1.13', info)
             self.assertIn(b'(Beta)', info)
 
     def test_manifest_complete_and_valid(self):

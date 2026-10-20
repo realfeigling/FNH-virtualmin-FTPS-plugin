@@ -40,3 +40,7 @@ Gemeldet wurde 550 index.html: Overwrite permission denied. Dem Plugin fehlte Al
 ## Korrektur der Update-Übernahme, 0.1.12 Beta
 
 Die Nutzerausgabe zeigte: gespeicherter Server-FQDN fehlt, aktive Datei enthält bereits den Server-FQDN; ausschließlich ServerIdent-Zeilen weichen ab. Die bisherige Migration lehnte diese Konstellation ab. Die ausdrückliche Migration akzeptiert jetzt diese exakt bekannte Variante mit aktuell validiertem lokalen FQDN. Andere Änderungen bleiben gesperrt. Kein direktes Ändern von Live-Zustand oder Live-Konfiguration beim Paketbau.
+
+## Korrektur der Virtualmin-Feldzuordnung, 0.1.13 Beta
+
+Die Nutzerausgabe zeigte dir=1 bei allen Domains. Die Plugin-Zuordnung von dir zum Home-Pfad war falsch. Sie verwendet jetzt home; der dir-Wert bleibt Aktivierungsmerkmal. Drei neue Tests prüfen die echte Perl-Descriptor-Funktion und ihre Übergabe an Python. Keine Änderung an Live-Domainfeldern oder Home-Verzeichnissen beim Paketbau.

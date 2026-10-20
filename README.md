@@ -1,12 +1,12 @@
 # FNH Virtualmin FTPS Plugin — Beta
 
-Version **0.1.12 Beta** für Virtualmin/Webmin und ProFTPD.
+Version **0.1.13 Beta** für Virtualmin/Webmin und ProFTPD.
 
 ## Download
 
-- [Installierbares Webmin-Paket](releases/0.1.12/virtualmin-ftps-0.1.12.wbm.gz)
-- [SHA-256-Prüfsumme](releases/0.1.12/virtualmin-ftps-0.1.12.wbm.gz.sha256)
-- [Änderungsübersicht](releases/0.1.12/AENDERUNGEN-0.1.12.md)
+- [Installierbares Webmin-Paket](releases/0.1.13/virtualmin-ftps-0.1.13.wbm.gz)
+- [SHA-256-Prüfsumme](releases/0.1.13/virtualmin-ftps-0.1.13.wbm.gz.sha256)
+- [Änderungsübersicht](releases/0.1.13/AENDERUNGEN-0.1.13.md)
 
 Das .wbm.gz-Paket über Webmin installieren. Ein bereits aktiver Abgleich-Timer kann nach Installation die neue ServerIdent-Begrüßung übernehmen. Keine erneute Einrichtung oder Aktivierung ohne Prüfung der bestehenden Installation.
 
@@ -21,6 +21,10 @@ AllowOverwrite on ist für jeden verwalteten Host gesetzt. Die bisherigen Unix-D
 ## Migration einer bereits geänderten Begrüßung
 
 Die ausdrückliche Migration akzeptiert eine exakt bekannte Datei mit lokalem Server-FQDN auch dann, wenn dieser im alten Zustand noch fehlt. [Anleitung](virtualmin-ftps/docs/GREETING-MIGRATION.md).
+
+## Korrektur der Home-Pfade
+
+Der tatsächliche Home-Pfad kommt aus Virtualmins home-Feld. Das dir-Feld ist ausschließlich ein Aktivierungsmerkmal. [Updatehinweise](virtualmin-ftps/docs/HOME-MAPPING.md).
 
 ## Dokumentation
 
