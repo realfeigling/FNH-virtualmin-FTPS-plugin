@@ -1,0 +1,23 @@
+name: FTPS domain logs
+on:
+  push:
+    paths:
+      - 'virtualmin-ftps/**'
+      - 'tests/**'
+      - '.github/workflows/domain-logs.yml'
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax
+        run: python3 -m py_compile virtualmin-ftps/engine.py virtualmin-ftps/manage.py
+      - name: Domain log tests (root-only backend)
+        run: sudo python3 -m unittest discover -s tests -v
+      - name: Perl syntax without Webmin runtime
+        run: |
+          perl -c virtualmin-ftps/index.cgi
+          perl -c virtualmin-ftps/collect.pl
+          perl -c virtualmin-ftps/report-lib.pl
+          perl -c virtualmin-ftps/virtual_feature.pl

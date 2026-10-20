@@ -39,6 +39,7 @@ my ($d) = @_;
 die "FTPS supports real domains with a home directory and website SSL only\n"
     if ($d->{'alias'} || !$d->{'dir'} || !&virtual_server::domain_has_ssl($d));
 my %r = map { $_ => $d->{$_} // '' } qw(id dom ip ip6 group);
+$r{'home'} = $d->{'dir'};
 $r{'cert'} = &virtual_server::get_website_ssl_file($d, 'cert');
 $r{'key'} = &virtual_server::get_website_ssl_file($d, 'key');
 $r{'ca'} = &virtual_server::get_website_ssl_file($d, 'ca') || '';

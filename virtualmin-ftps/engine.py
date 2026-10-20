@@ -184,7 +184,7 @@ def scan(conf, managed):
 
 
 def normalize(d):
-    allowed = {'id', 'dom', 'ip', 'ip6', 'group', 'cert', 'key', 'ca', 'suspended'}
+    allowed = {'id', 'dom', 'ip', 'ip6', 'group', 'cert', 'key', 'ca', 'suspended', 'home'}
     if set(d) - allowed:
         raise ValueError('Unknown domain descriptor fields')
     d = dict(d)
@@ -212,6 +212,7 @@ def normalize(d):
     for k in ('cert', 'key', 'ca'):
         if d.get(k) and (not re.fullmatch(r'/[A-Za-z0-9_./-]+', str(d[k]))):
             raise ValueError('Certificate paths must be absolute')
+    d['home'] = validate_home(d.get('home'))
     d['suspended'] = bool(d.get('suspended'))
     return d
 
@@ -333,6 +334,84 @@ def conflict(d, hosts):
     return None
 
 
+
+def validate_home(home):
+    if (not isinstance(home, str) or not re.fullmatch(r'/[A-Za-z0-9_./-]+', home)
+            or home == '/' or '..' in Path(home).parts
+            or str(Path(home)) != home):
+        raise ValueError('Domain home must be a canonical absolute ASCII path')
+    return home
+
+
+def log_paths(d):
+    home = validate_home(d['home'])
+    return (home + '/logs/ftp.log', home + '/logs/xferlog')
+
+
+def prepare_logs(domains):
+    """Apply only: create missing logs without truncation, following no symlinks.
+
+    Directory FDs prevent path replacement while files are opened. ProFTPD
+    independently checks paths when it reloads; domain home ancestors can still
+    be renamed by their owners, so its own log protections must stay enabled.
+    """
+    import grp
+    seen = {}
+    for d in domains.values():
+        if not d.get('home'):
+            continue  # Exact legacy state; populated by the full domain collector.
+        home = validate_home(d['home'])
+        if home in seen and seen[home] != d['id']:
+            raise ValueError('Multiple FTPS hosts share the same log directory')
+        seen[home] = d['id']
+        gid = grp.getgrnam(d['group']).gr_gid
+        fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            for part in Path(home).parts[1:]:
+                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                                dir_fd=fd)
+                os.close(fd)
+                fd = child
+                if os.fstat(fd).st_mode & 0o002:
+                    raise ValueError('World-writable domain home ancestor')
+            try:
+                os.mkdir('logs', 0o750, dir_fd=fd)
+                created_dir = True
+            except FileExistsError:
+                created_dir = False
+            logs = os.open('logs', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                           dir_fd=fd)
+            try:
+                if created_dir:
+                    os.fchown(logs, 0, gid)
+                    os.fchmod(logs, 0o750)
+                if os.fstat(logs).st_mode & 0o002:
+                    raise ValueError('World-writable log directory')
+                for name in ('ftp.log', 'xferlog'):
+                    try:
+                        f = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                    os.O_NOFOLLOW | os.O_NONBLOCK, 0o640, dir_fd=logs)
+                        created = True
+                    except FileExistsError:
+                        f = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                    dir_fd=logs)
+                        created = False
+                    try:
+                        if created:
+                            os.fchown(f, 0, gid)
+                            os.fchmod(f, 0o640)
+                        st = os.fstat(f)
+                        if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or
+                                st.st_uid != 0 or st.st_mode & 0o022):
+                            raise ValueError('Unsafe existing FTPS log file; review ownership and permissions')
+                    finally:
+                        os.close(f)
+            finally:
+                os.close(logs)
+        finally:
+            os.close(fd)
+
+
 def server_fqdn():
     """Resolve the local server identity each run; reject unsafe/short/IP names."""
     name = run(['/usr/bin/hostname', '--fqdn']).decode('ascii').strip().lower().rstrip('.')
@@ -376,6 +455,10 @@ def render(domains, c, legacy_login=False, legacy_ident=False, identity=None):
                 'TLSEngine on\nTLSRequired on\nTLSProtocol TLSv1.2 TLSv1.3\nTLSVerifyClient off\n',
                 f'{prefix}CertificateFile {cert}\n',
                 f'{prefix}CertificateKeyFile {key}\n']
+        if d.get('home'):
+            extended, transfer = log_paths(d)
+            out += [f'ExtendedLog {extended} ALL\n',
+                    f'TransferLog {transfer}\n']
         if d['has_ca']:
             out.append(f'TLSCertificateChainFile {chain}\n')
         out += ['<Limit LOGIN>\n', 'DenyAll\n' if d['suspended'] else
@@ -434,7 +517,6 @@ class Engine:
             journal.unlink()
 
     def commit(self, state, data, expected_current=None):
-        self.validate_config(data)
         current = self.managed.read_bytes()
         if not current.startswith(HEADER.encode()):
             raise ValueError('Managed file ownership marker missing')
@@ -442,6 +524,8 @@ class Engine:
         expected = render_state(oldstate, self.c) if expected_current is None else expected_current
         if current != expected:
             raise ValueError('Managed configuration drift; manual review required')
+        prepare_logs(state['domains'])
+        self.validate_config(data)
         old = {'state': oldstate, 'config': base64.b64encode(current).decode()}
         atomic(self.root / 'journal.json', json_bytes(old))
         try:
@@ -642,7 +726,7 @@ class Engine:
                 item = dict(d, kind=kind, fingerprint=fingerprint, has_ca=has_ca,
                             certificate_source='website')
                 if old != item:
-                    public_keys = ('dom', 'ip', 'ip6', 'group', 'suspended', 'kind', 'certificate_source')
+                    public_keys = ('dom', 'ip', 'ip6', 'group', 'suspended', 'kind', 'certificate_source', 'home')
                     changes.append({'id': d['id'], 'domain': d['dom'], 'kind': kind,
                                     'before': {k: old.get(k) for k in public_keys},
                                     'after': {k: item.get(k) for k in public_keys}})
