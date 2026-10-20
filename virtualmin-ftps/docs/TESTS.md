@@ -1,3 +1,9 @@
+# Prüfung 0.1.16 Beta
+
+23 isolierte Domain-/Log-/Migrationstests, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Archivprüfungen sind eingerichtet. Geprüft werden root-Eigentum und Domain-Gruppenleserechte, ein tatsächlicher Prozess mit Domain-UID/GID beim Versuch zu löschen/umzubenennen/überschreiben (muss abgewiesen werden), lesbarer Loginhalt für die Domain-Gruppe, Quell-Schnappschüsse ohne Quellenänderung, Wiederholbarkeit ohne doppelte Inhalte, Vorschau ohne Dateianlage, Symlink-/Hardlink-/Rechteabwehr, Übernahme alter Home-Pfade und Server-Begrüßungen, Dateianlage bei unverändertem Abgleich, Driftabwehr und Rücknahme bei simuliertem Reload-Fehler.
+
+Die bisherigen ausschließlich auf kundenbeschreibbare Home-Logs gerichteten Eigentümertests wurden durch Tests des geschützten Verzeichnisbaums ersetzt. Der Löschschutz wird unter Linux durch echte UID-/GID-Absenkung geprüft. ProFTPD-Syntaxprüfung und systemd-Reload bleiben simuliert. Kein echter FTP-Livetest. Ergebnisse siehe GitHub Actions.
+
 # Prüfung 0.1.15 Beta
 
 38 automatisierte Tests: 31 Domain-/Migrationsfälle, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Paketprüfungen. Neue Fälle prüfen die unveränderte root:root-Datei in der Vorschau, die anschließende Übertragung von Datei und Verzeichnis auf Domain-Benutzer/Gruppe mit Erhalt der 0644-Rechte und Inhalte, Ablehnung fremder root-Gruppen sowie Eigentümerfehler bereits in der Vorschau ohne Änderung von Konfiguration, Zustand oder Logs.

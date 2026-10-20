@@ -346,104 +346,127 @@ def validate_home(home):
 
 
 def log_paths(d):
-    home = validate_home(d['home'])
-    return (home + '/logs/ftp.log', home + '/logs/xferlog')
+    directory = d.get('log_dir') or (validate_home(d['home']) + '/logs')
+    return (directory + '/ftp.log', directory + '/xferlog')
 
 
-def prepare_logs(domains, apply=True):
-    """Check log paths; apply creates/migrates files without truncating them.
+def protected_log_dir(ident, c):
+    if not re.fullmatch(r'[0-9]{1,40}', str(ident)):
+        raise ValueError('Invalid domain ID for log directory')
+    root = c.get('log_root', '/var/log/virtualmin-ftps')
+    validate_home(root)
+    return str(Path(root) / str(ident))
 
-    Directory FDs prevent path replacement while files are opened. ProFTPD
-    independently checks paths when it reloads; domain home ancestors can still
-    be renamed by their owners, so its own log protections must stay enabled.
+
+def source_log(path, d, gid):
+    """Open a bounded historical snapshot without following any symlink."""
+    import pwd
+    fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in Path(path).parts[1:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                            dir_fd=fd)
+            os.close(fd)
+            fd = child
+            if os.fstat(fd).st_mode & 0o002:
+                raise ValueError(f'World-writable historical log path: {path}')
+        f = os.open(Path(path).name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                    dir_fd=fd)
+    except FileNotFoundError:
+        return None
+    finally:
+        os.close(fd)
+    st = os.fstat(f)
+    uid = pwd.getpwnam(d['user']).pw_uid if d.get('user') else None
+    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or
+            st.st_uid not in (0, uid) or st.st_gid not in (0, gid) or
+            st.st_mode & 0o002):
+        os.close(f)
+        raise ValueError(f'Unsafe historical FTPS log: {path}')
+    return f
+
+
+def prepare_logs(domains, c, apply=True, old_domains=None):
+    """Root-controlled destination tree; previews only inspect existing files.
+
+    Copy historical logs once, bounded by their size at open. Existing source
+    files and existing destination contents are never removed or truncated.
     """
     import grp
-    import pwd
-    seen = {}
-    for d in domains.values():
-        if not d.get('home'):
-            continue  # Exact legacy state; populated by the full domain collector.
-        home = validate_home(d['home'])
-        if home in seen and seen[home] != d['id']:
-            raise ValueError('Multiple FTPS hosts share the same log directory')
-        seen[home] = d['id']
-        if not d.get('user'):
-            raise ValueError(f'Missing domain user for {d["dom"]}; run a full domain collection')
-        uid = pwd.getpwnam(d['user']).pw_uid
+    if not domains:
+        return
+    root = Path(c.get('log_root', '/var/log/virtualmin-ftps'))
+    validate_home(str(root))
+    trusted(root.parent, directory=True)
+    if not root.exists() and apply:
+        root.mkdir(mode=0o711)
+        os.chown(root, 0, 0)
+        root.chmod(0o711)
+    if root.exists() or root.is_symlink():
+        trusted(root, directory=True)
+    for ident, d in domains.items():
+        target = Path(protected_log_dir(ident, c))
+        if d.get('log_dir') != str(target):
+            raise ValueError('Protected logs require a full domain reconciliation')
         gid = grp.getgrnam(d['group']).gr_gid
-        fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            for part in Path(home).parts[1:]:
-                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
-                                dir_fd=fd)
-                os.close(fd)
-                fd = child
-                if os.fstat(fd).st_mode & 0o002:
-                    raise ValueError('World-writable domain home ancestor')
-            created_dir = False
-            if apply:
+        created_dir = False
+        if not target.exists() and apply:
+            target.mkdir(mode=0o750)
+            os.chown(target, 0, gid)
+            target.chmod(0o750)
+            created_dir = True
+        if target.exists() or target.is_symlink():
+            trusted(target, directory=True)
+            if target.stat().st_gid != gid:
+                raise ValueError(f'Unexpected protected log directory group: {target}')
+        old = (old_domains or {}).get(ident, d)
+        for name in ('ftp.log', 'xferlog'):
+            path = target / name
+            if path.exists() or path.is_symlink():
+                fd = os.open(path, (os.O_WRONLY if apply else os.O_RDONLY) |
+                             os.O_NOFOLLOW | os.O_NONBLOCK)
                 try:
-                    os.mkdir('logs', 0o750, dir_fd=fd)
-                    created_dir = True
-                except FileExistsError:
-                    pass
+                    st = os.fstat(fd)
+                    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or
+                            st.st_uid != 0 or st.st_gid != gid or st.st_mode & 0o022):
+                        raise ValueError(f'Unsafe protected FTPS log: {path}')
+                finally:
+                    os.close(fd)
+                continue
+            # Existing states can have legacy home paths or an older log root.
+            previous = Path(log_paths(old)[0 if name == 'ftp.log' else 1])
+            src = source_log(previous, d, gid) if previous != path else None
             try:
-                logs = os.open('logs', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
-                               dir_fd=fd)
-            except FileNotFoundError:
                 if not apply:
                     continue
-                raise
-            try:
-                if created_dir:
-                    os.fchown(logs, uid, gid)
-                    os.fchmod(logs, 0o750)
-                directory = os.fstat(logs)
-                if directory.st_mode & 0o002:
-                    raise ValueError('World-writable log directory')
-                if apply and directory.st_uid == 0 and directory.st_gid in (0, gid) and not created_dir:
-                    os.fchown(logs, uid, gid)
-                for name in ('ftp.log', 'xferlog'):
-                    created = False
-                    if apply:
-                        try:
-                            f = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
-                                        os.O_NOFOLLOW | os.O_NONBLOCK, 0o640, dir_fd=logs)
-                            created = True
-                        except FileExistsError:
-                            f = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                                        dir_fd=logs)
-                    else:
-                        try:
-                            f = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                                        dir_fd=logs)
-                        except FileNotFoundError:
-                            continue
-                    try:
-                        st = os.fstat(f)
-                        if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or
-                                (not created and not (
-                                    (st.st_uid == uid and st.st_gid == gid) or
-                                    (st.st_uid == 0 and st.st_gid in (0, gid)))) or
-                                st.st_mode & 0o002):
-                            raise ValueError(
-                                f'Unsafe FTPS log {home}/logs/{name}: '
-                                f'uid={st.st_uid}, gid={st.st_gid}, '
-                                f'mode={stat.S_IMODE(st.st_mode):04o}, links={st.st_nlink}; '
-                                f'expected user {d["user"]} ({uid}) and group {d["group"]} ({gid}), '
-                                'regular single-link file without world-write access')
-                        # Preserve existing domain-owned files and their modes.
-                        # Migrate root-owned logs created by older plugin versions.
-                        if apply and (created or st.st_uid == 0):
-                            os.fchown(f, uid, gid)
-                        if created:
-                            os.fchmod(f, 0o640)
-                    finally:
-                        os.close(f)
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                             os.O_NOFOLLOW | os.O_NONBLOCK, 0o640)
+                try:
+                    os.fchown(fd, 0, gid)
+                    os.fchmod(fd, 0o640)
+                    if src is not None:
+                        remaining = os.fstat(src).st_size
+                        while remaining:
+                            data = os.read(src, min(remaining, 1024 * 1024))
+                            if not data:
+                                raise ValueError('Historical log changed during copy; retry')
+                            remaining -= len(data)
+                            view = memoryview(data)
+                            while view:
+                                n = os.write(fd, view)
+                                if n <= 0:
+                                    raise OSError('Unable to write historical log snapshot')
+                                view = view[n:]
+                    os.fsync(fd)
+                except BaseException:
+                    os.unlink(path)
+                    raise
+                finally:
+                    os.close(fd)
             finally:
-                os.close(logs)
-        finally:
-            os.close(fd)
+                if src is not None:
+                    os.close(src)
+
 
 
 def server_fqdn():
@@ -562,7 +585,7 @@ class Engine:
         expected = render_state(oldstate, self.c) if expected_current is None else expected_current
         if current != expected:
             raise ValueError('Managed configuration drift; manual review required')
-        prepare_logs(state['domains'])
+        prepare_logs(state['domains'], self.c, old_domains=oldstate['domains'])
         self.validate_config(data)
         old = {'state': oldstate, 'config': base64.b64encode(current).decode()}
         atomic(self.root / 'journal.json', json_bytes(old))
@@ -787,6 +810,8 @@ class Engine:
             # Deletion remains possible even if the site's primary TLS is broken.
             if apply and op != 'delete' and domains and warnings:
                 raise ValueError('; '.join(warnings))
+            domains = {ident: dict(d, log_dir=protected_log_dir(ident, self.c))
+                       for ident, d in domains.items()}
             identity = server_fqdn() if domains else state.get('server_fqdn')
             data = render(domains, self.c, identity=identity)
             newstate = {'domains': domains, 'pending': pending, 'allow_overwrite': True, 'allow_override': True}
@@ -800,8 +825,10 @@ class Engine:
                 if op in ('upsert', 'delete'):
                     newstate['last_lifecycle'] = now()
                 self.commit(newstate, data, expected_current=expected_current)
+            elif apply:
+                prepare_logs(domains, self.c, old_domains=state['domains'])
             elif not apply:
-                prepare_logs(domains, apply=False)
+                prepare_logs(domains, self.c, apply=False, old_domains=state['domains'])
                 if count == 1:
                     self.validate_config(data)
             return {'operation': op, 'applied': bool(apply and changed),

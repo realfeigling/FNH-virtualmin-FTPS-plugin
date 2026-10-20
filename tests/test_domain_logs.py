@@ -2,392 +2,211 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import pwd
+import grp
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
-import grp
-import pwd
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('ftps_engine', ROOT / 'virtualmin-ftps/engine.py')
+spec = importlib.util.spec_from_file_location('engine', ROOT / 'virtualmin-ftps/engine.py')
 e = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(e)
 
-
-class DomainLogs(unittest.TestCase):
+class ProtectedLogs(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(dir=Path(__file__).parent)
+        self.tmp = tempfile.TemporaryDirectory(prefix='ftps-protected-', dir='/run')
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.home = self.root / 'domain'
-        self.home.mkdir()
+        self.root.chmod(0o755)
         self.user = pwd.getpwnam('nobody')
         self.group = grp.getgrgid(self.user.pw_gid).gr_name
-        self.d = dict(id='1', dom='one.example', ip='192.0.2.1',
-                      group=self.group, user=self.user.pw_name, home=str(self.home), cert='/cert', key='/key',
+        self.home = self.root / 'customer-home'
+        self.home.mkdir()
+        os.chown(self.home, self.user.pw_uid, self.user.pw_gid)
+        self.c = dict(state_dir=str(self.root), managed_file=str(self.root/'managed'),
+                      proftpd_conf='/unused', mode='live', passive_ports=[49152,65534],
+                      log_root=str(self.root/'protected'))
+        self.d = dict(id='1', dom='one.example', ip='192.0.2.1', user=self.user.pw_name,
+                      group=self.group, home=str(self.home), cert='/cert', key='/key',
                       suspended=False, kind='RSA', fingerprint='same', has_ca=False,
                       certificate_source='website')
-        self.c = dict(state_dir=str(self.root), managed_file=str(self.root / 'managed'),
-                      proftpd_conf='/unused', mode='live', passive_ports=[49152, 65534])
+        self.protected = dict(self.d, log_dir=e.protected_log_dir('1', self.c))
+        self.path = Path(self.protected['log_dir'])
         self.engine = e.Engine(self.c)
 
-    def state(self, legacy=False):
-        d = dict(self.d)
-        if legacy:
-            d.pop('home')
-        state = dict(domains={'1': d}, pending={}, server_fqdn='server.example')
-        (self.root / 'state.json').write_text(json.dumps(state))
-        self.engine.managed.write_bytes(e.render_state(state, self.c))
+    def prepare(self, apply=True, old=None):
+        e.prepare_logs({'1':self.protected}, self.c, apply=apply, old_domains=old)
+
+    def old_logs(self, owner=None):
+        logs=self.home/'logs'; logs.mkdir(exist_ok=True)
+        os.chown(logs,self.user.pw_uid,self.user.pw_gid)
+        for name in ('ftp.log','xferlog'):
+            f=logs/name; f.write_text(name+' historical records\n')
+            os.chown(f, self.user.pw_uid if owner is None else owner, self.user.pw_gid)
+            f.chmod(0o644)
+        return logs
+
+    def state(self, old_greeting=False):
+        state=dict(domains={'1':dict(self.d)},pending={},allow_overwrite=True,
+                   allow_override=True,server_fqdn='server.example')
+        if old_greeting: state.pop('server_fqdn')
+        (self.root/'state.json').write_text(json.dumps(state))
+        data=e.render_state(state,self.c)
+        if old_greeting:
+            data=e.render(state['domains'],self.c,identity='server.example')
+        self.engine.managed.write_bytes(data)
         return state
 
-    def execute(self, apply=False, operation='reconcile'):
-        request = dict(operation=operation, domains=[{
-            k: v for k, v in self.d.items()
-            if k not in ('kind', 'fingerprint', 'has_ca', 'certificate_source')}])
-        with patch.object(e, 'scan', return_value=(
-                'Port 0\nDefaultServer off\n', [], [], [], 1)), \
-             patch.object(e, 'certificate', return_value=('RSA', 'same', False)), \
-             patch.object(e, 'server_fqdn', return_value='server.example'), \
-             patch.object(self.engine, 'validate_config'), \
-             patch.object(self.engine, 'reload'):
-            return self.engine._execute(request, apply)
+    def execute(self, apply=False):
+        request=dict(operation='use-website-certificates',domains=[{k:v for k,v in self.d.items()
+                     if k not in ('kind','fingerprint','has_ca','certificate_source')}])
+        with patch.object(e,'scan',return_value=('Port 0\nDefaultServer off\n',[],[],[],1)), \
+             patch.object(e,'certificate',return_value=('RSA','same',False)), \
+             patch.object(e,'server_fqdn',return_value='server.example'), \
+             patch.object(self.engine,'validate_config'),patch.object(self.engine,'reload'):
+            return self.engine._execute(request,apply)
 
-    def test_render_two_domains(self):
-        second = dict(self.d, id='2', dom='two.example', home=str(self.root / 'two'))
-        data = e.render({'1': self.d, '2': second}, self.c, identity='server.example').decode()
-        for d in (self.d, second):
-            block = data.split('<VirtualHost ')[1 if d['id'] == '1' else 2]
-            self.assertIn('ExtendedLog ' + d['home'] + '/logs/ftp.log ALL\n', block)
-            self.assertIn('TransferLog ' + d['home'] + '/logs/xferlog\n', block)
-        self.assertEqual(data.count('ServerIdent on "server.example"'), 2)
-        self.assertEqual(data.count('AllowOverwrite on\n'), 2)
-        self.assertEqual(data.count('AllowOverride on\n'), 2)
-        self.assertIn('ServerName "one.example"', data)
+    def test_new_logs_root_owned_group_readable(self):
+        self.prepare()
+        for name in ('ftp.log','xferlog'):
+            st=(self.path/name).stat()
+            self.assertEqual((st.st_uid,st.st_gid,st.st_mode&0o777),(0,self.user.pw_gid,0o640))
+        self.assertEqual((self.path.stat().st_uid,self.path.stat().st_mode&0o777),(0,0o750))
+        self.assertFalse((self.home/'logs').exists())
 
-    def test_invalid_home(self):
-        for home in ('', '/', 'relative', '/a/../b', '/a//b', '/a/', '/a\nInjected', '/a b'):
-            with self.subTest(home=home), self.assertRaises(ValueError):
-                e.validate_home(home)
+    def test_customer_cannot_delete_rename_or_write(self):
+        self.prepare()
+        script='''import os,sys
+from pathlib import Path
+p=Path(sys.argv[1]); root=p.parent
+for action in (lambda:p.unlink(), lambda:p.rename(p.with_name('removed.log')),
+               lambda:p.write_text('overwrite'),lambda:root.rename(root.with_name('removed-dir'))):
+    try: action()
+    except PermissionError: pass
+    else: raise SystemExit('customer operation unexpectedly succeeded')
+assert p.read_text()==''
+'''
+        def become_customer():
+            os.setgroups([self.user.pw_gid]); os.setgid(self.user.pw_gid); os.setuid(self.user.pw_uid)
+        result=subprocess.run([sys.executable,'-c',script,str(self.path/'ftp.log')],
+                              capture_output=True,text=True,preexec_fn=become_customer,cwd='/')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
-    def test_missing_home_descriptor(self):
-        d = dict(self.d)
-        for k in ('home', 'kind', 'fingerprint', 'has_ca', 'certificate_source'):
-            d.pop(k)
-        with self.assertRaises(ValueError):
-            e.normalize(d)
+    def test_copy_customer_history_without_touching_source(self):
+        logs=self.old_logs(); before={f:f.read_bytes() for f in logs.iterdir()}
+        self.prepare(old={'1':self.d})
+        for f,data in before.items():
+            self.assertEqual(f.read_bytes(),data)
+            self.assertEqual(f.stat().st_uid,self.user.pw_uid)
+            self.assertEqual((self.path/f.name).read_bytes(),data)
 
-    def test_create_and_preserve(self):
-        e.prepare_logs({'1': self.d})
-        for name in ('ftp.log', 'xferlog'):
-            p = self.home / 'logs' / name
-            self.assertTrue(p.is_file())
-            self.assertEqual(p.stat().st_mode & 0o777, 0o640)
-            self.assertEqual(p.stat().st_uid, self.user.pw_uid)
-            self.assertEqual(p.stat().st_gid, self.user.pw_gid)
-            p.write_text('existing records\n')
-        e.prepare_logs({'1': self.d})
-        self.assertEqual((self.home / 'logs/ftp.log').read_text(), 'existing records\n')
+    def test_copy_root_root_history(self):
+        logs=self.old_logs(owner=0)
+        for f in logs.iterdir():os.chown(f,0,0)
+        self.prepare(old={'1':self.d})
+        self.assertEqual((self.path/'ftp.log').read_text(),'ftp.log historical records\n')
+        self.assertEqual((logs/'ftp.log').stat().st_gid,0)
 
-    def test_log_symlink_rejected(self):
-        (self.home / 'logs').mkdir()
-        target = self.root / 'target'
-        target.write_text('preserve')
-        (self.home / 'logs/ftp.log').symlink_to(target)
-        with self.assertRaises(OSError):
-            e.prepare_logs({'1': self.d})
-        self.assertEqual(target.read_text(), 'preserve')
+    def test_existing_destination_never_truncated_or_duplicated(self):
+        logs=self.old_logs(); self.prepare(old={'1':self.d})
+        (logs/'ftp.log').write_text('different old records')
+        self.prepare(old={'1':self.d})
+        self.assertEqual((self.path/'ftp.log').read_text(),'ftp.log historical records\n')
 
-    def test_directory_symlink_rejected(self):
-        target = self.root / 'target'
-        target.mkdir()
-        (self.home / 'logs').symlink_to(target)
-        with self.assertRaises(OSError):
-            e.prepare_logs({'1': self.d})
-        self.assertEqual(list(target.iterdir()), [])
+    def test_preview_creates_nothing(self):
+        self.old_logs(); self.prepare(False,{'1':self.d})
+        self.assertFalse(Path(self.c['log_root']).exists())
 
-    def test_home_symlink_rejected(self):
-        link = self.root / 'link'
-        link.symlink_to(self.home)
-        with self.assertRaises(OSError):
-            e.prepare_logs({'1': dict(self.d, home=str(link))})
+    def test_preview_preserves_source_owner(self):
+        logs=self.old_logs(); self.prepare(False,{'1':self.d})
+        self.assertEqual((logs/'ftp.log').stat().st_uid,self.user.pw_uid)
 
-    def test_hardlink_rejected(self):
-        (self.home / 'logs').mkdir()
-        target = self.root / 'target'
-        target.write_text('preserve')
-        os.link(target, self.home / 'logs/ftp.log')
-        with self.assertRaises(ValueError):
-            e.prepare_logs({'1': self.d})
-        self.assertEqual(target.read_text(), 'preserve')
+    def test_historical_symlink_refused(self):
+        logs=self.old_logs(); (logs/'ftp.log').unlink();(logs/'ftp.log').symlink_to('/etc/passwd')
+        with self.assertRaises(OSError):self.prepare(False,{'1':self.d})
 
-    def test_world_writable_logs_rejected(self):
-        (self.home / 'logs').mkdir()
-        (self.home / 'logs').chmod(0o777)
-        with self.assertRaises(ValueError):
-            e.prepare_logs({'1': self.d})
+    def test_historical_hardlink_refused(self):
+        logs=self.old_logs();os.link(logs/'ftp.log',logs/'second-link')
+        with self.assertRaises(ValueError):self.prepare(False,{'1':self.d})
 
-    def test_world_writable_file_rejected(self):
-        e.prepare_logs({'1': self.d})
-        (self.home / 'logs/ftp.log').chmod(0o666)
-        with self.assertRaises(ValueError):
-            e.prepare_logs({'1': self.d})
+    def test_target_symlink_refused(self):
+        self.prepare(); f=self.path/'ftp.log';f.unlink();f.symlink_to('/etc/passwd')
+        with self.assertRaises(OSError):self.prepare()
 
-    def test_duplicate_home_rejected(self):
-        with self.assertRaises(ValueError):
-            e.prepare_logs({'1': self.d, '2': dict(self.d, id='2')})
+    def test_target_hardlink_refused(self):
+        self.prepare();os.link(self.path/'ftp.log',self.path/'second-link')
+        with self.assertRaises(ValueError):self.prepare()
 
-    def test_legacy_render_unchanged(self):
-        state = self.state(legacy=True)
-        self.assertNotIn(b'ExtendedLog', e.render_state(state, self.c))
-        self.assertNotIn(b'TransferLog', e.render_state(state, self.c))
+    def test_target_customer_owner_refused(self):
+        self.prepare();os.chown(self.path/'ftp.log',self.user.pw_uid,self.user.pw_gid)
+        with self.assertRaisesRegex(ValueError,'protected FTPS log'):self.prepare(False)
 
-    def test_preview_no_files_no_state_change(self):
-        self.state(legacy=True)
-        before = self.engine.managed.read_bytes()
-        state_before = (self.root / 'state.json').read_bytes()
-        result = self.execute(False)
-        self.assertTrue(result['changed'])
-        self.assertFalse(result['applied'])
-        self.assertFalse((self.home / 'logs').exists())
-        self.assertEqual(self.engine.managed.read_bytes(), before)
-        self.assertEqual((self.root / 'state.json').read_bytes(), state_before)
+    def test_target_group_write_refused(self):
+        self.prepare();(self.path/'ftp.log').chmod(0o660)
+        with self.assertRaises(ValueError):self.prepare(False)
 
-    def test_migration_idempotence_delete_retains_logs(self):
-        self.state(legacy=True)
-        self.assertTrue(self.execute(True)['applied'])
-        first = self.engine.managed.read_bytes()
-        self.assertIn(b'ExtendedLog', first)
-        self.assertEqual(e.load_json(self.root / 'state.json')['domains']['1']['home'], str(self.home))
-        (self.home / 'logs/ftp.log').write_text('records')
-        self.assertFalse(self.execute(True)['changed'])
-        request = {'operation': 'delete', 'id': '1'}
-        with patch.object(e, 'scan', return_value=('Port 0\nDefaultServer off\n', [], [], [], 1)), \
-             patch.object(self.engine, 'validate_config'), patch.object(self.engine, 'reload'):
-            self.engine._execute(request, True)
-        self.assertEqual((self.home / 'logs/ftp.log').read_text(), 'records')
+    def test_customer_owned_parent_refused(self):
+        other=self.root/'customer-root';other.mkdir();os.chown(other,self.user.pw_uid,self.user.pw_gid)
+        c=dict(self.c,log_root=str(other/'protected'))
+        with self.assertRaisesRegex(ValueError,'root-controlled'):
+            e.prepare_logs({'1':dict(self.d,log_dir=e.protected_log_dir('1',c))},c)
 
-    def test_foreign_changes_refused_before_log_creation(self):
-        self.state(legacy=True)
-        self.engine.managed.write_bytes(self.engine.managed.read_bytes() + b'# foreign\n')
-        with self.assertRaisesRegex(ValueError, 'drift'):
-            self.execute(True)
-        self.assertFalse((self.home / 'logs').exists())
+    def test_group_writable_root_refused(self):
+        self.prepare();Path(self.c['log_root']).chmod(0o770)
+        with self.assertRaises(ValueError):self.prepare(False)
 
-    def test_overwrite_migration_preserves_logs_and_permissions(self):
-        self.state()  # 0.1.10: logs exist, overwrite flag absent.
-        e.prepare_logs({'1': self.d})
-        log = self.home / 'logs/ftp.log'
-        log.write_text('keep records')
-        before_mode = log.stat().st_mode
-        before = self.engine.managed.read_bytes()
-        self.assertNotIn(b'AllowOverwrite', before)
+    def test_invalid_root_path_refused(self):
+        for root in ('relative','/','/var/log/../tmp'):
+            with self.subTest(root=root),self.assertRaises(ValueError):e.protected_log_dir('1',{'log_root':root})
+
+    def test_legacy_renderer_preserved(self):
+        state=self.state();data=e.render_state(state,self.c)
+        self.assertIn(str(self.home/'logs/ftp.log').encode(),data)
+        self.assertNotIn(str(self.path).encode(),data)
+
+    def test_render_protected_paths_and_customer_rules(self):
+        data=e.render({'1':self.protected},self.c,identity='server.example')
+        self.assertIn(f'ExtendedLog {self.path}/ftp.log ALL'.encode(),data)
+        self.assertIn(b'AllowOverride on',data);self.assertIn(b'AllowOverwrite on',data)
+
+    def test_migration_preview_then_apply(self):
+        self.state();logs=self.old_logs();before=self.engine.managed.read_bytes()
+        state_before=(self.root/'state.json').read_bytes()
         self.assertTrue(self.execute(False)['changed'])
-        self.assertEqual(self.engine.managed.read_bytes(), before)
+        self.assertEqual(self.engine.managed.read_bytes(),before)
+        self.assertEqual((self.root/'state.json').read_bytes(),state_before)
+        self.assertFalse(self.path.exists())
         self.assertTrue(self.execute(True)['applied'])
-        self.assertIn(b'AllowOverwrite on\n', self.engine.managed.read_bytes())
-        self.assertTrue(e.load_json(self.root / 'state.json')['allow_overwrite'])
-        self.assertEqual(log.read_text(), 'keep records')
-        self.assertEqual(log.stat().st_mode, before_mode)
+        self.assertIn(str(self.path).encode(),self.engine.managed.read_bytes())
+        self.assertEqual((self.path/'ftp.log').read_bytes(),(logs/'ftp.log').read_bytes())
         self.assertFalse(self.execute(True)['changed'])
 
-    def greeting_only_legacy_state(self, identity='server.example'):
-        state = self.state(legacy=True)
-        state.pop('server_fqdn')
-        (self.root / 'state.json').write_text(json.dumps(state))
-        self.engine.managed.write_bytes(e.render(
-            state['domains'], self.c, identity=identity, allow_overwrite=False, allow_override=False))
-        return state
-
-    def test_legacy_server_greeting_without_state_migrates(self):
-        self.greeting_only_legacy_state()
-        before = self.engine.managed.read_bytes()
-        state_before = (self.root / 'state.json').read_bytes()
-        result = self.execute(False, operation='use-website-certificates')
-        self.assertTrue(result['changed'])
-        self.assertFalse(result['applied'])
-        self.assertEqual(self.engine.managed.read_bytes(), before)
-        self.assertEqual((self.root / 'state.json').read_bytes(), state_before)
-        self.assertFalse((self.home / 'logs').exists())
-        self.assertTrue(self.execute(True, operation='use-website-certificates')['applied'])
-        state = e.load_json(self.root / 'state.json')
-        self.assertEqual(state['server_fqdn'], 'server.example')
-        self.assertTrue(state['allow_overwrite'])
-        self.assertEqual(state['domains']['1']['home'], str(self.home))
-        self.assertIn(b'ExtendedLog', self.engine.managed.read_bytes())
-        self.assertIn(b'AllowOverwrite on', self.engine.managed.read_bytes())
-        self.assertFalse(self.execute(True, operation='use-website-certificates')['changed'])
-
-    def test_legacy_greeting_migration_rejects_other_changes(self):
-        self.greeting_only_legacy_state()
-        before = self.engine.managed.read_bytes().replace(
-            b'PassivePorts 49152 65534', b'PassivePorts 50000 50100')
-        self.engine.managed.write_bytes(before)
-        with self.assertRaisesRegex(ValueError, 'drift'):
-            self.execute(True, operation='use-website-certificates')
-        self.assertEqual(self.engine.managed.read_bytes(), before)
-        self.assertFalse((self.home / 'logs').exists())
-
-    def test_legacy_greeting_migration_rejects_other_hostname(self):
-        self.greeting_only_legacy_state(identity='other.example')
-        before = self.engine.managed.read_bytes()
-        with self.assertRaisesRegex(ValueError, 'drift'):
-            self.execute(False, operation='use-website-certificates')
-        self.assertEqual(self.engine.managed.read_bytes(), before)
-
-    def test_reported_uid_1015_gid_1018_0644_preserved(self):
-        from types import SimpleNamespace
-        import pwd
-        (self.home / 'logs').mkdir()
-        for name in ('ftp.log', 'xferlog'):
-            f = self.home / 'logs' / name
-            f.write_text('existing customer records')
-            os.chown(f, 1015, 1018)
-            f.chmod(0o644)
-        with patch.object(pwd, 'getpwnam', return_value=SimpleNamespace(pw_uid=1015)), \
-             patch.object(grp, 'getgrnam', return_value=SimpleNamespace(gr_gid=1018)):
-            e.prepare_logs({'1': self.d})
-        for name in ('ftp.log', 'xferlog'):
-            f = self.home / 'logs' / name
-            self.assertEqual((f.stat().st_uid, f.stat().st_gid), (1015, 1018))
-            self.assertEqual(f.stat().st_mode & 0o777, 0o644)
-            self.assertEqual(f.read_text(), 'existing customer records')
-
-    def test_domain_group_write_accepted(self):
-        e.prepare_logs({'1': self.d})
-        f = self.home / 'logs/ftp.log'
-        f.chmod(0o664)
-        e.prepare_logs({'1': self.d})
-        self.assertEqual(f.stat().st_mode & 0o777, 0o664)
-
-    def test_root_owned_legacy_logs_migrate_without_truncation(self):
-        logs = self.home / 'logs'
-        logs.mkdir()
-        os.chown(logs, 0, self.user.pw_gid)
-        for name in ('ftp.log', 'xferlog'):
-            f = logs / name
-            f.write_text('keep root-created records')
-            os.chown(f, 0, self.user.pw_gid)
-            f.chmod(0o644)
-        e.prepare_logs({'1': self.d})
-        self.assertEqual(logs.stat().st_uid, self.user.pw_uid)
-        for name in ('ftp.log', 'xferlog'):
-            f = logs / name
-            self.assertEqual((f.stat().st_uid, f.stat().st_gid),
-                             (self.user.pw_uid, self.user.pw_gid))
-            self.assertEqual(f.stat().st_mode & 0o777, 0o644)
-            self.assertEqual(f.read_text(), 'keep root-created records')
-
-    def test_foreign_log_user_refused_with_path(self):
-        e.prepare_logs({'1': self.d})
-        f = self.home / 'logs/ftp.log'
-        f.write_text('preserve')
-        os.chown(f, 12345, self.user.pw_gid)
-        with self.assertRaisesRegex(ValueError, 'ftp.log.*uid=12345'):
-            e.prepare_logs({'1': self.d})
-        self.assertEqual(f.stat().st_uid, 12345)
-        self.assertEqual(f.read_text(), 'preserve')
-
-    def test_foreign_log_group_refused(self):
-        e.prepare_logs({'1': self.d})
-        f = self.home / 'logs/ftp.log'
-        os.chown(f, self.user.pw_uid, 12345)
-        with self.assertRaisesRegex(ValueError, 'gid=12345'):
-            e.prepare_logs({'1': self.d})
-        self.assertEqual(f.stat().st_gid, 12345)
-
-    def test_missing_user_rejected(self):
-        d = dict(self.d)
-        d.pop('user')
-        with self.assertRaisesRegex(ValueError, 'domain user'):
-            e.prepare_logs({'1': d})
-
-    def test_013_override_off_state_migrates(self):
-        old = self.state()
-        old['domains']['1'].pop('user')
-        old['allow_overwrite'] = True
-        (self.root / 'state.json').write_text(json.dumps(old))
-        self.engine.managed.write_bytes(e.render_state(old, self.c))
-        self.assertIn(b'AllowOverride off', self.engine.managed.read_bytes())
-        before = self.engine.managed.read_bytes()
-        self.assertTrue(self.execute(False)['changed'])
-        self.assertEqual(self.engine.managed.read_bytes(), before)
-        self.assertTrue(self.execute(True)['applied'])
-        current = self.engine.managed.read_bytes()
-        self.assertIn(b'AllowOverride on', current)
-        self.assertIn(b'AllowOverwrite on', current)
-        state = e.load_json(self.root / 'state.json')
-        self.assertTrue(state['allow_override'])
-        self.assertEqual(state['domains']['1']['user'], self.user.pw_name)
+    def test_missing_target_recreated_on_unchanged_apply(self):
+        self.state();self.execute(True);(self.path/'ftp.log').unlink()
         self.assertFalse(self.execute(True)['changed'])
+        self.assertTrue((self.path/'ftp.log').exists())
 
-    def test_preview_preserves_root_owned_files(self):
-        self.state()
-        logs = self.home / 'logs'
-        logs.mkdir()
-        f = logs / 'ftp.log'
-        f.write_text('preserve')
-        os.chown(f, 0, self.user.pw_gid)
-        self.execute(False)
-        self.assertEqual(f.stat().st_uid, 0)
-        self.assertEqual(f.read_text(), 'preserve')
+    def test_foreign_configuration_refused(self):
+        self.state();self.engine.managed.write_bytes(self.engine.managed.read_bytes()+b'# foreign\n')
+        with self.assertRaisesRegex(ValueError,'drift'):self.execute(True)
+        self.assertFalse(self.path.exists())
 
-    def test_root_root_legacy_logs_migrate(self):
-        logs = self.home / 'logs'
-        logs.mkdir()
-        os.chown(logs, 0, 0)
-        for name in ('ftp.log', 'xferlog'):
-            f = logs / name
-            f.write_text('keep root-root records')
-            os.chown(f, 0, 0)
-            f.chmod(0o644)
-        e.prepare_logs({'1': self.d}, apply=False)
-        self.assertEqual(logs.stat().st_uid, 0)
-        self.assertEqual((logs / 'ftp.log').stat().st_gid, 0)
-        e.prepare_logs({'1': self.d})
-        self.assertEqual((logs.stat().st_uid, logs.stat().st_gid),
-                         (self.user.pw_uid, self.user.pw_gid))
-        for name in ('ftp.log', 'xferlog'):
-            f = logs / name
-            self.assertEqual((f.stat().st_uid, f.stat().st_gid),
-                             (self.user.pw_uid, self.user.pw_gid))
-            self.assertEqual(f.stat().st_mode & 0o777, 0o644)
-            self.assertEqual(f.read_text(), 'keep root-root records')
+    def test_old_greeting_migration_still_supported(self):
+        self.state(old_greeting=True);self.assertTrue(self.execute(True)['applied'])
+        self.assertEqual(e.load_json(self.root/'state.json')['server_fqdn'],'server.example')
 
-    def test_root_foreign_group_refused(self):
-        e.prepare_logs({'1': self.d})
-        f = self.home / 'logs/ftp.log'
-        os.chown(f, 0, 12345)
-        with self.assertRaisesRegex(ValueError, 'gid=12345'):
-            e.prepare_logs({'1': self.d})
-        self.assertEqual((f.stat().st_uid, f.stat().st_gid), (0, 12345))
+    def test_reload_failure_restores_configuration_and_state(self):
+        old=self.state();before=self.engine.managed.read_bytes()
+        new=dict(old,domains={'1':self.protected})
+        with patch.object(self.engine,'validate_config'), \
+             patch.object(self.engine,'reload',side_effect=[ValueError('reload failed'),None]), \
+             self.assertRaisesRegex(ValueError,'reload failed'):
+            self.engine.commit(new,e.render_state(new,self.c))
+        self.assertEqual(self.engine.managed.read_bytes(),before)
+        self.assertEqual(e.load_json(self.root/'state.json'),old)
+        self.assertTrue((self.path/'ftp.log').exists())
 
-    def test_preview_checks_foreign_log_owner_without_changes(self):
-        self.state()
-        e.prepare_logs({'1': self.d})
-        f = self.home / 'logs/ftp.log'
-        f.write_text('unchanged')
-        os.chown(f, 12345, self.user.pw_gid)
-        before = self.engine.managed.read_bytes()
-        state_before = (self.root / 'state.json').read_bytes()
-        with self.assertRaisesRegex(ValueError, 'ftp.log.*uid=12345'):
-            self.execute(False)
-        self.assertEqual(f.read_text(), 'unchanged')
-        self.assertEqual(f.stat().st_uid, 12345)
-        self.assertEqual(self.engine.managed.read_bytes(), before)
-        self.assertEqual((self.root / 'state.json').read_bytes(), state_before)
-
-    def test_reload_failure_restores_config_and_state(self):
-        old = self.state(legacy=True)
-        before = self.engine.managed.read_bytes()
-        new = dict(old, domains={'1': self.d})
-        with patch.object(self.engine, 'validate_config'), \
-             patch.object(self.engine, 'reload', side_effect=[ValueError('reload failed'), None]), \
-             self.assertRaisesRegex(ValueError, 'reload failed'):
-            self.engine.commit(new, e.render_state(new, self.c))
-        self.assertEqual(self.engine.managed.read_bytes(), before)
-        self.assertEqual(e.load_json(self.root / 'state.json'), old)
-        self.assertTrue((self.home / 'logs/ftp.log').exists())
-
-
-if __name__ == '__main__':
-    unittest.main()
+if __name__=='__main__':unittest.main()

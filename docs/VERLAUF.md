@@ -52,3 +52,7 @@ Der Nutzer stellte klar, dass Logs den Domain-Benutzern und ihren Gruppen gehör
 ## Root:root-Altlogs und Vorschauprüfung, 0.1.15 Beta
 
 Die Anwendung traf auf eine reguläre Logdatei mit UID 0, GID 0 und 0644. Die bisherige Übernahme akzeptierte nur root mit passender Domain-Gruppe. Diese Lücke ist geschlossen: root:root wird ohne Leeren und Rechteänderung auf Domain-Benutzer:Domain-Gruppe übertragen. Die Vorschau prüft vorhandene Logs nun lesend. Keine Live-Serveränderung beim Paketbau.
+
+## Root-Logs mit Löschschutz, 0.1.16 Beta
+
+Der Nutzer änderte die Anforderung: FTP-Logs sollen root gehören, damit der Kunde sie nicht löschen kann. Root-Eigentum allein im kundenbeschreibbaren Home wäre unzureichend. Die aktive Protokollierung verwendet deshalb einen root-kontrollierten Verzeichnisbaum unter /var/log/virtualmin-ftps/DOMAIN-ID mit Domain-Gruppenleserechten. Vorhandene Home-Logs werden als Schnappschuss übernommen und nicht gelöscht. Ein Testprozess mit Domain-UID/GID prüft, dass Lesen gelingt und Löschen, Umbenennen sowie Schreiben abgewiesen werden. Kein Live-Serverzugriff beim Paketbau.
