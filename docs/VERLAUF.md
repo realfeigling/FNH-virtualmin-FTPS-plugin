@@ -48,3 +48,7 @@ Die Nutzerausgabe zeigte dir=1 bei allen Domains. Die Plugin-Zuordnung von dir z
 ## Log-Eigentümer und Kundenregeln, 0.1.14 Beta
 
 Der Nutzer stellte klar, dass Logs den Domain-Benutzern und ihren Gruppen gehören. Die bisherige root-Anforderung war falsch. Das Plugin übernimmt jetzt user und group aus Virtualmin, akzeptiert passende vorhandene Logs unverändert und legt neue Logs entsprechend an. Root-eigene Altlogs mit passender Gruppe werden ohne Leeren übertragen. Außerdem wurde auf ausdrücklichen Wunsch AllowOverride on gesetzt; AllowOverwrite on bleibt aktiv. Neue Regressionstests bilden die gemeldeten Werte UID 1015/GID 1018/0644 ab. Keine Live-Serveränderung beim Paketbau.
+
+## Root:root-Altlogs und Vorschauprüfung, 0.1.15 Beta
+
+Die Anwendung traf auf eine reguläre Logdatei mit UID 0, GID 0 und 0644. Die bisherige Übernahme akzeptierte nur root mit passender Domain-Gruppe. Diese Lücke ist geschlossen: root:root wird ohne Leeren und Rechteänderung auf Domain-Benutzer:Domain-Gruppe übertragen. Die Vorschau prüft vorhandene Logs nun lesend. Keine Live-Serveränderung beim Paketbau.

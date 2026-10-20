@@ -331,6 +331,51 @@ class DomainLogs(unittest.TestCase):
         self.assertEqual(f.stat().st_uid, 0)
         self.assertEqual(f.read_text(), 'preserve')
 
+    def test_root_root_legacy_logs_migrate(self):
+        logs = self.home / 'logs'
+        logs.mkdir()
+        os.chown(logs, 0, 0)
+        for name in ('ftp.log', 'xferlog'):
+            f = logs / name
+            f.write_text('keep root-root records')
+            os.chown(f, 0, 0)
+            f.chmod(0o644)
+        e.prepare_logs({'1': self.d}, apply=False)
+        self.assertEqual(logs.stat().st_uid, 0)
+        self.assertEqual((logs / 'ftp.log').stat().st_gid, 0)
+        e.prepare_logs({'1': self.d})
+        self.assertEqual((logs.stat().st_uid, logs.stat().st_gid),
+                         (self.user.pw_uid, self.user.pw_gid))
+        for name in ('ftp.log', 'xferlog'):
+            f = logs / name
+            self.assertEqual((f.stat().st_uid, f.stat().st_gid),
+                             (self.user.pw_uid, self.user.pw_gid))
+            self.assertEqual(f.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(f.read_text(), 'keep root-root records')
+
+    def test_root_foreign_group_refused(self):
+        e.prepare_logs({'1': self.d})
+        f = self.home / 'logs/ftp.log'
+        os.chown(f, 0, 12345)
+        with self.assertRaisesRegex(ValueError, 'gid=12345'):
+            e.prepare_logs({'1': self.d})
+        self.assertEqual((f.stat().st_uid, f.stat().st_gid), (0, 12345))
+
+    def test_preview_checks_foreign_log_owner_without_changes(self):
+        self.state()
+        e.prepare_logs({'1': self.d})
+        f = self.home / 'logs/ftp.log'
+        f.write_text('unchanged')
+        os.chown(f, 12345, self.user.pw_gid)
+        before = self.engine.managed.read_bytes()
+        state_before = (self.root / 'state.json').read_bytes()
+        with self.assertRaisesRegex(ValueError, 'ftp.log.*uid=12345'):
+            self.execute(False)
+        self.assertEqual(f.read_text(), 'unchanged')
+        self.assertEqual(f.stat().st_uid, 12345)
+        self.assertEqual(self.engine.managed.read_bytes(), before)
+        self.assertEqual((self.root / 'state.json').read_bytes(), state_before)
+
     def test_reload_failure_restores_config_and_state(self):
         old = self.state(legacy=True)
         before = self.engine.managed.read_bytes()

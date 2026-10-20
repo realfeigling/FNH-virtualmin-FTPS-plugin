@@ -1,12 +1,12 @@
 # FNH Virtualmin FTPS Plugin — Beta
 
-Version **0.1.14 Beta** für Virtualmin/Webmin und ProFTPD.
+Version **0.1.15 Beta** für Virtualmin/Webmin und ProFTPD.
 
 ## Download
 
-- [Installierbares Webmin-Paket](releases/0.1.14/virtualmin-ftps-0.1.14.wbm.gz)
-- [SHA-256-Prüfsumme](releases/0.1.14/virtualmin-ftps-0.1.14.wbm.gz.sha256)
-- [Änderungsübersicht](releases/0.1.14/AENDERUNGEN-0.1.14.md)
+- [Installierbares Webmin-Paket](releases/0.1.15/virtualmin-ftps-0.1.15.wbm.gz)
+- [SHA-256-Prüfsumme](releases/0.1.15/virtualmin-ftps-0.1.15.wbm.gz.sha256)
+- [Änderungsübersicht](releases/0.1.15/AENDERUNGEN-0.1.15.md)
 
 Das .wbm.gz-Paket über Webmin installieren. Ein bereits aktiver Abgleich-Timer kann nach Installation die neue ServerIdent-Begrüßung übernehmen. Keine erneute Einrichtung oder Aktivierung ohne Prüfung der bestehenden Installation.
 

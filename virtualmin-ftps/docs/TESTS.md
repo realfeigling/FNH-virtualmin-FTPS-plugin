@@ -1,3 +1,9 @@
+# Prüfung 0.1.15 Beta
+
+38 automatisierte Tests: 31 Domain-/Migrationsfälle, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Paketprüfungen. Neue Fälle prüfen die unveränderte root:root-Datei in der Vorschau, die anschließende Übertragung von Datei und Verzeichnis auf Domain-Benutzer/Gruppe mit Erhalt der 0644-Rechte und Inhalte, Ablehnung fremder root-Gruppen sowie Eigentümerfehler bereits in der Vorschau ohne Änderung von Konfiguration, Zustand oder Logs.
+
+Echte isolierte Linux-Dateisystemtests, simulierte ProFTPD-/systemd-Aufrufe. Kein Live-Serverzugriff. Ergebnisse: GitHub Actions.
+
 # Prüfung 0.1.14 Beta
 
 35 automatisierte Tests: 28 Domain-/Migrationsfälle, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Archivprüfungen. Neue Fälle prüfen UID 1015/GID 1018 mit 0644 unverändert, Neuanlage mit echter nicht-root-Domain-Identität, zulässige Gruppen-Schreibrechte, Migration root-eigener Altlogs ohne Leeren, fremde Eigentümer/Gruppen mit konkreten Fehlermeldungen, fehlende Benutzerangaben, Vorschau ohne chown und Übernahme von AllowOverride off nach on. AllowOverwrite on bleibt je Host geprüft.

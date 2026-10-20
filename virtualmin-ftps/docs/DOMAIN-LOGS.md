@@ -1,4 +1,4 @@
-# Domainbezogene FTP-Logs — 0.1.14 Beta
+# Domainbezogene FTP-Logs — 0.1.15 Beta
 
 Das Home-Verzeichnis stammt aus Virtualmins home-Feld; dir ist ausschließlich das Aktivierungsmerkmal. Benutzer und Gruppe stammen aus user und group. Benutzer-/Gruppennamen werden im Backend über die lokale Unix-Benutzerverwaltung aufgelöst.
 
@@ -17,11 +17,11 @@ Jeder Host erhält seine eigenen Pfade. Mehrere Hosts mit identischem Home-Verze
 
 Fehlende Logverzeichnisse werden mit Domain-Benutzer:Domain-Gruppe und 0750, fehlende Logdateien mit Domain-Benutzer:Domain-Gruppe und 0640 angelegt. Bestehende passende Domain-Logs behalten Eigentümer, Gruppe, Rechte und Inhalt. Auch bestehende 0644- oder 0664-Dateien werden akzeptiert; Schreibrechte für Andere bleiben gesperrt.
 
-Reguläre root-eigene Logdateien mit passender Domain-Gruppe werden beim angewendeten Abgleich auf den Domain-Benutzer übertragen. Das korrigiert die Anlage durch frühere Plugin-Versionen. Rechte und Inhalt bleiben dabei erhalten. Root-eigene logs-Verzeichnisse mit passender Gruppe werden ebenfalls übertragen. Andere fremde Eigentümer oder Gruppen werden mit einer Meldung einschließlich Pfad und Ist-/Sollwerten abgewiesen. Bestehende Domainverzeichnisse werden nicht pauschal umgechownt.
+Reguläre root-eigene Logdateien mit root-Gruppe (GID 0) oder passender Domain-Gruppe werden beim angewendeten Abgleich auf den Domain-Benutzer übertragen. Das korrigiert die Anlage durch frühere Plugin-Versionen. Rechte und Inhalt bleiben dabei erhalten. Root-eigene logs-Verzeichnisse mit root-Gruppe oder passender Domain-Gruppe werden ebenfalls übertragen. Andere fremde Eigentümer oder Gruppen werden mit einer Meldung einschließlich Pfad und Ist-/Sollwerten abgewiesen. Bestehende Domainverzeichnisse werden nicht pauschal umgechownt.
 
 Symlinks, nicht reguläre Dateien, Mehrfach-Hardlinks und weltweit beschreibbare Verzeichnisse bleiben gesperrt. Dateien werden relativ zu geöffneten Verzeichnisdeskriptoren ohne Symlink-Verfolgung geöffnet. Die bestehenden ProFTPD-Logschutzregeln bleiben erforderlich; Domain-Besitzer können Pfade unter ihrem Home weiterhin umbenennen.
 
-Vorschauen erstellen keine Logs und ändern keine Eigentümer, Rechte, Konfiguration oder Zustandsdateien. Erst Anwendung erstellt Dateien bzw. korrigiert die beschriebenen root-eigenen Altdateien. Logs bleiben bei Domain-Löschung, Deaktivierung und Rücknahme erhalten. Bei Fehlern können neu angelegte Dateien und bereits korrigierte Log-Eigentümer zurückbleiben; der Konfigurations-Rollback setzt Dateieigentümer nicht zurück. Aufbewahrung und Logrotation werden nicht neu eingerichtet.
+Vorschauen prüfen vorhandene Logpfade, Eigentümer und Gruppen lesend. Fehlende Logs gelten dabei als bei Anwendung anzulegen. Vorschauen erstellen keine Logs und ändern keine Eigentümer, Rechte, Konfiguration oder Zustandsdateien. Erst Anwendung erstellt Dateien bzw. korrigiert die beschriebenen root-eigenen Altdateien. Logs bleiben bei Domain-Löschung, Deaktivierung und Rücknahme erhalten. Bei Fehlern können neu angelegte Dateien und bereits korrigierte Log-Eigentümer zurückbleiben; der Konfigurations-Rollback setzt Dateieigentümer nicht zurück. Aufbewahrung und Logrotation werden nicht neu eingerichtet.
 
 ## Anwendung
 

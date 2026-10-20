@@ -350,8 +350,8 @@ def log_paths(d):
     return (home + '/logs/ftp.log', home + '/logs/xferlog')
 
 
-def prepare_logs(domains):
-    """Apply only: create missing logs without truncation, following no symlinks.
+def prepare_logs(domains, apply=True):
+    """Check log paths; apply creates/migrates files without truncating them.
 
     Directory FDs prevent path replacement while files are opened. ProFTPD
     independently checks paths when it reloads; domain home ancestors can still
@@ -380,13 +380,20 @@ def prepare_logs(domains):
                 fd = child
                 if os.fstat(fd).st_mode & 0o002:
                     raise ValueError('World-writable domain home ancestor')
+            created_dir = False
+            if apply:
+                try:
+                    os.mkdir('logs', 0o750, dir_fd=fd)
+                    created_dir = True
+                except FileExistsError:
+                    pass
             try:
-                os.mkdir('logs', 0o750, dir_fd=fd)
-                created_dir = True
-            except FileExistsError:
-                created_dir = False
-            logs = os.open('logs', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
-                           dir_fd=fd)
+                logs = os.open('logs', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                               dir_fd=fd)
+            except FileNotFoundError:
+                if not apply:
+                    continue
+                raise
             try:
                 if created_dir:
                     os.fchown(logs, uid, gid)
@@ -394,22 +401,30 @@ def prepare_logs(domains):
                 directory = os.fstat(logs)
                 if directory.st_mode & 0o002:
                     raise ValueError('World-writable log directory')
-                if directory.st_uid == 0 and directory.st_gid == gid and not created_dir:
+                if apply and directory.st_uid == 0 and directory.st_gid in (0, gid) and not created_dir:
                     os.fchown(logs, uid, gid)
                 for name in ('ftp.log', 'xferlog'):
-                    try:
-                        f = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
-                                    os.O_NOFOLLOW | os.O_NONBLOCK, 0o640, dir_fd=logs)
-                        created = True
-                    except FileExistsError:
-                        f = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                                    dir_fd=logs)
-                        created = False
+                    created = False
+                    if apply:
+                        try:
+                            f = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                        os.O_NOFOLLOW | os.O_NONBLOCK, 0o640, dir_fd=logs)
+                            created = True
+                        except FileExistsError:
+                            f = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                        dir_fd=logs)
+                    else:
+                        try:
+                            f = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                        dir_fd=logs)
+                        except FileNotFoundError:
+                            continue
                     try:
                         st = os.fstat(f)
                         if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or
-                                (not created and (st.st_uid not in (0, uid) or
-                                                  st.st_gid != gid)) or
+                                (not created and not (
+                                    (st.st_uid == uid and st.st_gid == gid) or
+                                    (st.st_uid == 0 and st.st_gid in (0, gid)))) or
                                 st.st_mode & 0o002):
                             raise ValueError(
                                 f'Unsafe FTPS log {home}/logs/{name}: '
@@ -419,7 +434,7 @@ def prepare_logs(domains):
                                 'regular single-link file without world-write access')
                         # Preserve existing domain-owned files and their modes.
                         # Migrate root-owned logs created by older plugin versions.
-                        if created or st.st_uid == 0:
+                        if apply and (created or st.st_uid == 0):
                             os.fchown(f, uid, gid)
                         if created:
                             os.fchmod(f, 0o640)
@@ -785,8 +800,10 @@ class Engine:
                 if op in ('upsert', 'delete'):
                     newstate['last_lifecycle'] = now()
                 self.commit(newstate, data, expected_current=expected_current)
-            elif not apply and count == 1:
-                self.validate_config(data)
+            elif not apply:
+                prepare_logs(domains, apply=False)
+                if count == 1:
+                    self.validate_config(data)
             return {'operation': op, 'applied': bool(apply and changed),
                     'changed': changed, 'updates': changes, 'removed_ids': removed,
                     'pending': {i: {'domain': p['domain']['dom'], 'reason': p['error']}

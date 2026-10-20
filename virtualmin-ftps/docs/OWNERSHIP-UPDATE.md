@@ -1,4 +1,4 @@
-# Log-Eigentümer und Kundenregeln — 0.1.14 Beta
+# Log-Eigentümer und Kundenregeln — 0.1.15 Beta
 
 Die root-Eigentümerforderung der Versionen 0.1.10 bis 0.1.13 war mit den gewünschten Domain-Logs unvereinbar. Neue und bestehende Logs verwenden jetzt Domain-Benutzer und Domain-Gruppe. Ein vorhandenes Paar mit UID 1015, GID 1018 und 0644 wird akzeptiert, wenn es zu den von Virtualmin gemeldeten Benutzer-/Gruppennamen gehört. Ein manuelles chown root ist nicht nötig.
 
@@ -6,7 +6,7 @@ Außerdem werden je Host AllowOverride on und AllowOverwrite on gesetzt. AllowOv
 
 ## Installation und Anwendung
 
-0.1.14 Beta über Webmin installieren. Danach zuerst die Vorschau:
+0.1.15 Beta über Webmin installieren. Danach zuerst die Vorschau:
 
 ```bash
 perl /opt/webmin-2.670/virtualmin-ftps/collect.pl --use-website-certificates
@@ -31,3 +31,7 @@ grep -nE 'ServerName|AllowOverride|AllowOverwrite|ExtendedLog|TransferLog' /etc/
 Beim Paketbau wurden keine Live-Serverkonfigurationen oder Live-Dateieigentümer geändert. Bei Anwendung können passende root-eigene Altlogs auf den Domain-Benutzer übertragen werden; siehe DOMAIN-LOGS.md für Erhalt und Rücknahmegrenzen.
 
 Quellen: [ProFTPD AllowOverride](https://github.com/proftpd/proftpd/blob/master/doc/modules/mod_core.html) und [AllowOverwrite](https://github.com/proftpd/proftpd/blob/master/doc/modules/mod_xfer.html).
+
+## Root:root-Altdateien
+
+Auch reguläre root:root-Logs (UID 0/GID 0) werden beim Anwenden auf den Domain-Benutzer und seine Gruppe übertragen, ohne Leeren oder Änderung ihrer bestehenden Rechte. Die Vorschau prüft bestehende Dateien bereits auf unterstützte Eigentümer und Gruppen. Ein manuelles chown ist nicht nötig.
