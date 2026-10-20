@@ -64,3 +64,7 @@ Die /var/log-Elternprüfung scheiterte auf dem Zielserver. Gewünscht wurden unv
 ## 0.1.18 Beta – Logablage unter /var/log
 
 Auf Nutzerwunsch auf /var/log/virtualmin-ftps-logs umgestellt. Root-Eigentum, lesbare schreibgeschützte FTP-Ansicht und Logs and Reports erhalten. Alte Originaldateien nicht gelöscht oder verschoben. Keine Live-Konfiguration geändert.
+
+## 0.1.19 Beta – Systemverweis für /var/log
+
+Die Diagnose auf web4 zeigt /var/log -> /data/log; beide Eltern und das Ziel gehören root mit 0755. Die bisherige Ablehnung aller Verweise war die Ursache. Ausschließlich der geprüfte Systemverweis wird nun für Logs unterstützt, einschließlich FTP-Einhängung und historischer Übernahme.

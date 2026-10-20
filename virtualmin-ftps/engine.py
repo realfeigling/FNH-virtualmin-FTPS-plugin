@@ -17,7 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from log_views import prepare_views, unmount_view
+from log_views import prepare_views, unmount_view, resolve_log_source
 
 HEADER = '# Managed by virtualmin-ftps 0.1.0; edit via Virtualmin only.\n'
 MODULE = 'virtualmin-ftps'
@@ -76,6 +76,9 @@ def trusted(path, directory=False, log_path=False):
     # Every ancestor must be controlled by root; prevents replaced symlink parents.
     for q in [p, *p.parents]:
         s = q.lstat()
+        if log_path and q == Path('/var/log') and stat.S_ISLNK(s.st_mode):
+            trusted(resolve_log_source(q), directory=True)
+            continue
         if (log_path and q == Path('/var/log') and stat.S_ISDIR(s.st_mode)
                 and s.st_uid == 0 and not s.st_mode & 0o002):
             # Only standard system logging groups may control /var/log.
@@ -392,6 +395,7 @@ def protected_log_dir(ident, c):
 def source_log(path, d, gid):
     """Open a bounded historical snapshot without following any symlink."""
     import pwd
+    path = resolve_log_source(path)
     fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
     try:
         for part in Path(path).parts[1:-1]:

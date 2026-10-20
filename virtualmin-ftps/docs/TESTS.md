@@ -1,5 +1,3 @@
-# Prüfung 0.1.18 Beta
+# Prüfung 0.1.19 Beta
 
-Die Tests prüfen zusätzlich den Wechsel des Log-Stammverzeichnisses mit echtem Bind-Mount, Erhalt alter Inhalte und neue Standard-/Altpfad-Abbildung. Bestehende Chroot-, Rechte-, ACL-, Perl-, Paket- und Manifestprüfungen laufen unverändert weiter.
-
-Zusätzlich werden die /var/log-Ausnahme, unbekannte Gruppen, Kundenmitgliedschaften, Welt-Schreibrechte, erweiterte ACLs sowie die unverändert strenge allgemeine Pfadprüfung getestet.
+Zusätzliche Tests prüfen den root-eigenen /var/log-Verweis, die unverändert strenge allgemeine Pfadprüfung, fremdes Link-Eigentum, unsichere Zielrechte, weitere Ziel-Verweise, historische Logübernahme und einen echten schreibgeschützten Bind-Mount über den Systemverweis. Die bisherigen 61 Tests laufen weiterhin.

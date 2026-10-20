@@ -1,4 +1,4 @@
-# FTP-Logs, Kundenansicht und Logs and Reports — 0.1.18 Beta
+# FTP-Logs, Kundenansicht und Logs and Reports — 0.1.19 Beta
 
 Die geschützten Originale liegen standardmäßig unter /var/log/virtualmin-ftps-logs/DOMAIN-ID. Die bisherigen automatischen Ablagen neben state_dir sowie /var/log/virtualmin-ftps werden auf diesen Standard abgebildet. Individuelle andere log_root-Werte bleiben erhalten und müssen einen root-kontrollierten Elternpfad besitzen. /var/log und dessen Rechte werden nicht geändert.
 
@@ -20,7 +20,7 @@ feature_webmin meldet die begrenzten Leserechte an Virtualmin. Für bestehende H
 
 ## Anwendung
 
-Modul 0.1.18 Beta über Webmin installieren. Zuerst Vorschau:
+Modul 0.1.19 Beta über Webmin installieren. Zuerst Vorschau:
 
 ~~~bash
 perl /opt/webmin-2.670/virtualmin-ftps/collect.pl --use-website-certificates
@@ -39,3 +39,5 @@ Den Modulpfad anpassen, falls Webmin an anderer Stelle aktiv ist. Ein aktiver Ti
 Beim Paketbau wurde keine Live-Serverkonfiguration geändert und kein Mount auf dem Zielserver eingerichtet.
 
 Quelle für Menü-/ACL-Schnittstellen: https://www.virtualmin.com/docs/development/creating-plugins/
+
+Ein root-eigener Verweis /var/log -> /data/log wird unterstützt, sofern Ziel und Ziel-Eltern root-eigen und nicht gruppen- oder weltschreibbar sind. Der konfigurierte Pfad bleibt /var/log/virtualmin-ftps-logs; die physische Ablage folgt diesem Verweis.

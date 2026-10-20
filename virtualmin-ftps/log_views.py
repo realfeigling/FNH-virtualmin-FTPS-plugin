@@ -10,6 +10,29 @@ import stat
 LIBC = ctypes.CDLL(None, use_errno=True)
 
 
+
+def resolve_log_source(source):
+    """Allow only the administrator-owned /var/log alias; pin its safe target later."""
+    source = Path(source)
+    alias = Path('/var/log')
+    if not source.is_relative_to(alias) or not alias.is_symlink():
+        return str(source)
+    link = alias.lstat()
+    parent = alias.parent.lstat()
+    if (link.st_uid != 0 or parent.st_uid != 0 or
+            not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022):
+        raise ValueError('Unprotected /var/log alias')
+    raw = os.readlink(alias)
+    target = Path(raw)
+    if (not target.is_absolute() or '..' in target.parts or str(target) != raw):
+        raise ValueError('Noncanonical /var/log alias target')
+    for p in (target, *target.parents):
+        s = p.lstat()
+        if (not stat.S_ISDIR(s.st_mode) or s.st_uid != 0 or s.st_mode & 0o022):
+            raise ValueError(f'Unprotected /var/log alias target: {p}')
+    return str(target / source.relative_to(alias))
+
+
 def mount_entry(target):
     for line in Path('/proc/self/mountinfo').read_text().splitlines():
         fields = line.split(' - ', 1)[0].split()
@@ -72,6 +95,7 @@ def unmount_view(d):
 def readonly_bind(source, target_fd, target):
     if platform.machine() not in ('x86_64', 'aarch64'):
         raise ValueError('Read-only FTP views currently require Linux x86_64 or aarch64')
+    source = resolve_log_source(source)
     source_fd = open_directory(source)
     tree = -1
     attached = False
