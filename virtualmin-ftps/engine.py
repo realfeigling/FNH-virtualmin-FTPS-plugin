@@ -71,11 +71,24 @@ def load_json(path, default=None):
     return json.loads(Path(path).read_text()) if Path(path).exists() else default
 
 
-def trusted(path, directory=False):
+def trusted(path, directory=False, log_path=False):
     p = Path(path)
     # Every ancestor must be controlled by root; prevents replaced symlink parents.
     for q in [p, *p.parents]:
         s = q.lstat()
+        if (log_path and q == Path('/var/log') and stat.S_ISDIR(s.st_mode)
+                and s.st_uid == 0 and not s.st_mode & 0o002):
+            # Only standard system logging groups may control /var/log.
+            # Customer accounts (including supplementary membership) fail closed.
+            import grp, pwd
+            group = grp.getgrgid(s.st_gid)
+            if s.st_mode & 0o020:
+                members = [u for u in pwd.getpwall()
+                           if u.pw_gid == s.st_gid or u.pw_name in group.gr_mem]
+                if group.gr_name not in ('root', 'syslog', 'adm') or any(
+                        u.pw_uid >= 1000 for u in members):
+                    raise ValueError('Untrusted writable /var/log group')
+            continue
         if stat.S_ISLNK(s.st_mode) or s.st_uid != 0 or s.st_mode & 0o022:
             raise ValueError(f'Not a root-controlled path: {q}')
     if directory and not p.is_dir():
@@ -353,9 +366,10 @@ def log_paths(d):
 
 def effective_log_root(c):
     configured = c.get('log_root')
-    if not configured or configured == '/var/log/virtualmin-ftps':
-        state = Path(c['state_dir'])
-        return str(state.parent / (state.name + '-logs'))
+    state = Path(c['state_dir'])
+    previous_default = str(state.parent / (state.name + '-logs'))
+    if not configured or configured in ('/var/log/virtualmin-ftps', previous_default):
+        return '/var/log/virtualmin-ftps-logs'
     return configured
 
 
@@ -406,13 +420,13 @@ def prepare_logs(domains, c, apply=True, old_domains=None):
         return
     root = Path(effective_log_root(c))
     validate_home(str(root))
-    trusted(root.parent, directory=True)
+    trusted(root.parent, directory=True, log_path=True)
     if not root.exists() and apply:
         root.mkdir(mode=0o711)
         os.chown(root, 0, 0)
         root.chmod(0o711)
     if root.exists() or root.is_symlink():
-        trusted(root, directory=True)
+        trusted(root, directory=True, log_path=True)
     for ident, d in domains.items():
         target = Path(protected_log_dir(ident, c))
         if d.get('log_dir') != str(target):
@@ -425,7 +439,7 @@ def prepare_logs(domains, c, apply=True, old_domains=None):
             target.chmod(0o750)
             created_dir = True
         if target.exists() or target.is_symlink():
-            trusted(target, directory=True)
+            trusted(target, directory=True, log_path=True)
             if target.stat().st_gid != gid:
                 raise ValueError(f'Unexpected protected log directory group: {target}')
         old = (old_domains or {}).get(ident, d)
@@ -607,6 +621,10 @@ class Engine:
         atomic(self.root / 'journal.json', json_bytes(old))
         mounted = []
         try:
+            for ident, previous in oldstate['domains'].items():
+                current_domain = state['domains'].get(ident, {})
+                if previous.get('log_view') and previous.get('log_dir') != current_domain.get('log_dir'):
+                    unmount_view(previous)
             mounted = prepare_views(state['domains'])
             atomic(self.managed, data)
             self.reload()
@@ -659,7 +677,7 @@ class Engine:
         if not d or not d.get('log_dir'):
             raise ValueError('Protected logs are not yet configured for this domain')
         directory = Path(d['log_dir'])
-        trusted(directory, directory=True)
+        trusted(directory, directory=True, log_path=True)
         path = directory / ('ftp.log' if name == 'ftp' else 'xferlog')
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         try:
@@ -888,7 +906,9 @@ class Engine:
                 prepare_views(domains)
             elif not apply:
                 prepare_logs(domains, self.c, apply=False, old_domains=state['domains'])
-                prepare_views(domains, apply=False)
+                preview_views = {ident: dict(d, log_dir=state['domains'].get(ident, d).get('log_dir', d['log_dir']))
+                                 for ident, d in domains.items()}
+                prepare_views(preview_views, apply=False)
                 if count == 1:
                     self.validate_config(data)
             return {'operation': op, 'applied': bool(apply and changed),

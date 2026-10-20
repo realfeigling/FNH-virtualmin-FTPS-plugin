@@ -60,3 +60,7 @@ Der Nutzer änderte die Anforderung: FTP-Logs sollen root gehören, damit der Ku
 ## Kunden-Logs und Logs and Reports, 0.1.17 Beta
 
 Die /var/log-Elternprüfung scheiterte auf dem Zielserver. Gewünscht wurden unveränderte /var/log-Rechte, geschützte Logs mit Zugang unter Kunden-Logs und native Menüeinträge. Auf Rückfrage wurde direkter FTP-Zugriff innerhalb des Chroots ausdrücklich gewünscht. Die neue Ablage verwendet einen root-kontrollierten Bereich neben state_dir, eine schreibgeschützte Bind-Ansicht unter logs/ftps und domainbegrenzte Webmin-Leseansichten. Keine Live-Serveränderung beim Paketbau.
+
+## 0.1.18 Beta – Logablage unter /var/log
+
+Auf Nutzerwunsch auf /var/log/virtualmin-ftps-logs umgestellt. Root-Eigentum, lesbare schreibgeschützte FTP-Ansicht und Logs and Reports erhalten. Alte Originaldateien nicht gelöscht oder verschoben. Keine Live-Konfiguration geändert.

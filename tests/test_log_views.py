@@ -94,12 +94,36 @@ for op in (lambda:p.unlink(),lambda:p.rename(p.with_name('gone')),
         with patch('log_views.mount_entry',return_value={'ro'}),self.assertRaises(ValueError):
             unmount_view(d)
 
-    def test_old_var_log_default_is_migrated_without_touching_var_log(self):
-        c=dict(self.c,log_root='/var/log/virtualmin-ftps')
-        self.assertEqual(e.effective_log_root(c),
-                         str(Path(self.c['state_dir']).parent /
-                             (Path(self.c['state_dir']).name+'-logs')))
-        self.assertNotIn('/var/log',e.protected_log_dir('1',c))
+    def test_old_and_missing_defaults_use_new_var_log_root(self):
+        for configured in (None, '/var/log/virtualmin-ftps',
+                           str(Path(self.c['state_dir']).parent / (Path(self.c['state_dir']).name+'-logs'))):
+            c=dict(self.c,log_root=configured)
+            self.assertEqual(e.effective_log_root(c), '/var/log/virtualmin-ftps-logs')
+            self.assertEqual(e.protected_log_dir('1',c), '/var/log/virtualmin-ftps-logs/1')
+
+    def test_explicit_custom_root_preserved(self):
+        self.assertEqual(e.effective_log_root(self.c), self.c['log_root'])
+
+    def test_change_root_rebinds_view_and_preserves_old_log(self):
+        self.prepare();d=self.view();prepare_views({'1':d})
+        self.addCleanup(lambda:unmount_view(d))
+        (self.path/'ftp.log').write_text('historical')
+        c=dict(self.c,log_root=str(self.root/'new-logs'))
+        new=dict(d,log_dir=e.protected_log_dir('1',c))
+        state=dict(domains={'1':d},pending={},server_fqdn='server.example',
+                   allow_override=True,allow_overwrite=True)
+        (self.root/'state.json').write_text(__import__('json').dumps(state))
+        self.engine.managed.write_bytes(e.render_state(state,self.c))
+        self.engine.c=c
+        newstate=dict(state,domains={'1':new})
+        with patch.object(self.engine,'validate_config'),patch.object(self.engine,'reload'):
+            self.engine.commit(newstate,e.render_state(newstate,c))
+        self.addCleanup(lambda:unmount_view(new))
+        self.assertEqual(Path(new['log_dir'],'ftp.log').read_text(),'historical')
+        self.assertEqual((self.path/'ftp.log').read_text(),'historical')
+        self.assertEqual(Path(new['log_view'],'ftp.log').stat().st_ino,
+                         Path(new['log_dir'],'ftp.log').stat().st_ino)
+        unmount_view(new)
 
 
 class LogReader(unittest.TestCase):

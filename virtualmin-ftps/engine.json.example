@@ -8,5 +8,6 @@
     49152,
     65534
   ],
-  "default_domain": ""
+  "default_domain": "",
+  "log_root": "/var/log/virtualmin-ftps-logs"
 }
