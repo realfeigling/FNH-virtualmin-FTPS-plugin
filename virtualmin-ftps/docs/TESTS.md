@@ -1,3 +1,3 @@
-# Prüfung 0.1.20 Beta
+# Prüfung 0.1.21 Beta
 
-Zusätzlich zu den bisherigen 68 Prüfungen: echte Logrotate-Läufe mit weiter geöffnetem Schreiber, Inode-/Eigentümer-/Gruppen-/Moduserhalt, komprimierte Archive, Vorschau ohne Rotation, wiederholbare Installation und Schutz fremder Konfigurationen sowie Abweisung kundeneigener Logwurzeln.
+Zusätzlich zu den bisherigen 73 Prüfungen: benutzerdefinierte Rotationswerte, Wochen-/52-Standard bei fehlenden Einstellungen sowie Abweisung ungültiger Typen, Grenzen, unbekannter Felder und eingeschleuster Logrotate-Anweisungen. Echte Rotationen mit offenem Schreiber, Archivkomprimierung und Rechteerhalt bleiben enthalten.

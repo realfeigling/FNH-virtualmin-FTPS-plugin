@@ -9,5 +9,10 @@
     65534
   ],
   "default_domain": "",
-  "log_root": "/var/log/virtualmin-ftps-logs"
+  "log_root": "/var/log/virtualmin-ftps-logs",
+  "logrotate": {
+    "interval": "weekly",
+    "rotate": 52,
+    "maxsize": null
+  }
 }

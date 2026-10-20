@@ -286,7 +286,25 @@ LOGROTATE_FILE = Path('/etc/logrotate.d/virtualmin-ftps')
 LOGROTATE_MARKER = '# Managed by virtualmin-ftps logrotate\n'
 
 
+def logrotate_policy(c):
+    policy = c.get('logrotate', {})
+    if not isinstance(policy, dict) or set(policy) - {'interval', 'rotate', 'maxsize'}:
+        raise ValueError('Unknown logrotate settings')
+    interval = policy.get('interval', 'weekly')
+    count = policy.get('rotate', 52)
+    size = policy.get('maxsize')
+    if interval not in ('daily', 'weekly', 'monthly'):
+        raise ValueError('Logrotate interval must be daily, weekly or monthly')
+    if type(count) is not int or not 1 <= count <= 3660:
+        raise ValueError('Logrotate rotate must be an integer between 1 and 3660')
+    if size is not None and (not isinstance(size, str) or
+                            not re.fullmatch(r'[1-9][0-9]{0,8}[kMG]', size)):
+        raise ValueError('Logrotate maxsize must be null or a size such as 100M')
+    return interval, count, size
+
+
 def logrotate_config(c):
+    interval, count, size = logrotate_policy(c)
     root = engine.effective_log_root(c)
     engine.validate_home(root)
     engine.trusted(Path(root).parent, directory=True, log_path=True)
@@ -298,7 +316,8 @@ def logrotate_config(c):
     # Exact filenames only: never rotate archives or customer home directories.
     return (LOGROTATE_MARKER +
             f'"{root}/[0-9]*/ftp.log" "{root}/[0-9]*/xferlog" {{\n'
-            '    daily\n    rotate 14\n    maxsize 100M\n'
+            f'    {interval}\n    rotate {count}\n' +
+            (f'    maxsize {size}\n' if size else '') +
             '    missingok\n    notifempty\n    compress\n    delaycompress\n'
             '    copytruncate\n    su root root\n}\n').encode()
 

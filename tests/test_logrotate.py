@@ -64,11 +64,30 @@ class LogRotation(unittest.TestCase):
         data=self.config().read_text()
         self.assertNotIn(str(self.home),data)
         self.assertNotIn('postrotate',data);self.assertNotIn('systemctl',data)
-        self.assertIn('copytruncate',data);self.assertIn('rotate 14',data)
-        self.assertIn('daily',data);self.assertIn('maxsize 100M',data)
+        self.assertIn('copytruncate',data);self.assertIn('rotate 52',data)
+        self.assertIn('weekly',data);self.assertNotIn('maxsize',data)
 
     def test_customer_owned_rotation_root_refused(self):
         self.prepare();os.chown(self.path.parent,self.user.pw_uid,self.user.pw_gid)
         with self.assertRaises(ValueError):m.logrotate_config(self.c)
+
+    def test_custom_settings_rendered(self):
+        self.prepare()
+        c=dict(self.c,logrotate={'interval':'daily','rotate':365,'maxsize':'100M'})
+        data=m.logrotate_config(c).decode()
+        self.assertIn('daily',data);self.assertIn('rotate 365',data)
+        self.assertIn('maxsize 100M',data)
+
+    def test_invalid_policy_rejected(self):
+        for value in (None, [], {'interval':'daily\npostrotate'},
+                      {'rotate':True}, {'rotate':0}, {'rotate':3661},
+                      {'maxsize':'100M\npostrotate'}, {'maxsize':100},
+                      {'interval':'yearly'}, {'postrotate':'anything'}):
+            with self.subTest(value=value),self.assertRaises(ValueError):
+                m.logrotate_policy({'logrotate':value})
+
+    def test_missing_settings_default_weekly_year(self):
+        self.assertEqual(m.logrotate_policy({}),('weekly',52,None))
+        self.assertEqual(m.logrotate_policy({'logrotate':{}}),('weekly',52,None))
 
 del ProtectedLogs

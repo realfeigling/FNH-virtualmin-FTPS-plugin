@@ -72,3 +72,7 @@ Die Diagnose auf web4 zeigt /var/log -> /data/log; beide Eltern und das Ziel geh
 ## 0.1.20 Beta – Logrotation
 
 Auf Nutzerwunsch geprüfte Logrotate-Konfiguration für geschützte FTP-Logs ergänzt. Einrichtung über manage.py install-logrotate; tägliche Rotation mit 14 Archiven und Erhalt laufender FTP-Dateideskriptoren. Kein Live-Serverzugriff.
+
+## 0.1.21 Beta – Konfigurierbare Rotation
+
+Auf Nutzerwunsch Intervall, Archivanzahl und optionale Größenrotation als logrotate-Abschnitt in engine.json ergänzt. Neuer Standard weekly/52 ohne maxsize. Änderungen werden über geprüften install-logrotate-Aufruf übernommen; vorhandene Konfigurationen beim Paket-Update bleiben erhalten.
