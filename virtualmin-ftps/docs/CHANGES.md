@@ -1,3 +1,10 @@
+# 0.1.10 — Beta
+
+- ExtendedLog und TransferLog je Domain unter dem von Virtualmin gelieferten Home-Verzeichnis.
+- Fehlende Logdateien werden beim Anwenden ohne Leeren vorhandener Logs angelegt.
+- Sichere Pfad-/Dateiprüfung, Übernahme alter Zustände und Erhalt der Logs bei Löschung/Rücknahme.
+- Details: DOMAIN-LOGS.md. Automatisierte Regressionstests im Repository.
+
 # 0.1.9 — Beta
 
 - Modulmetadaten, Prüfseiten-Titel und aktuelle Dokumentation kennzeichnen das Plugin als Beta.

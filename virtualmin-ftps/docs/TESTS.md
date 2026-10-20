@@ -1,3 +1,9 @@
+# Prüfung 0.1.10 Beta
+
+20. Oktober 2026: 16 Python-Regressionstests auf GitHub Actions (Ubuntu, root-only Backend) bestanden. Geprüft: getrennte Domain-Logpfade, ungültige/fehlende Homes, sichere Dateianlage und Erhalt vorhandener Inhalte, Symlink-/Hardlink-/Rechteabwehr, doppelte Homes, Vorschau ohne Dateianlage, Übernahme alter Zustände, Wiederholbarkeit, Erhalt der Logs bei Domain-Löschung, Driftabwehr und Rücknahme bei simuliertem Reload-Fehler.
+
+Python-Syntax und vier Perl-Syntaxprüfungen bestanden. ProFTPD-Syntaxprüfung und systemd-Reload in den Transaktionstests simuliert; keine Live-Abnahme. Die WebminCore-abhängige Perl-Bibliothek wurde nicht im echten Webmin ausgeführt. Paketstruktur, Prüfsummen und Übereinstimmung mit dem Quellstand werden zusätzlich automatisiert geprüft.
+
 # Prüfung 0.1.9 Beta
 
 20. Oktober 2026: 10 lokale Testmethoden bestanden (einschließlich negativer FQDN-Unterfälle): gültige/normierte Namen, ungültige/kurze/IP-/Steuerzeichen-Namen, Ermittlungsfehler, Domain-ServerName/ServerAlias bei Server-FQDN-Begrüßung, alte Domain-Identität und Login-Reihenfolge, gespeicherte Identität, mehrere Hosts mit einmaliger Ermittlung, leere Hostliste, Migration/Hostnamenwechsel/Rücknahme/Driftabwehr und Wiederherstellung nach Reload-Fehler. ProFTPD-Syntaxprüfung und Reload sind in den Transaktionstests simuliert; keine Live-Konfiguration wurde geändert.

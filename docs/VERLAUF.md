@@ -28,3 +28,7 @@ Originalmanifest, neues vollständiges Manifest, gzip-/Tar-Lesbarkeit, native Ar
 ## Installation und spätere Anwendung
 
 Das Paket unter releases/0.1.9 wird über Webmin installiert. Ein bereits aktiver Abgleich-Timer kann danach die neue Begrüßung anwenden. Hinweise zu Vorschau, Anwendung, Syntaxprüfung und Rücknahme stehen in virtualmin-ftps/docs/SERVER-IDENT.md. Die Beta-Kennzeichnung ist keine nachträgliche Live-Abnahme.
+
+## Ergänzung: Domain-Logs, 0.1.10 Beta
+
+Auf Wunsch werden ExtendedLog und TransferLog je VirtualHost unter dem jeweiligen Domain-Home angelegt und dauerhaft gespeichert. Der Beispielpfad wird nicht fest übernommen. Sichere Dateianlage, Migration und Erhalt vorhandener Logs sind umgesetzt; 16 Regressionstests auf GitHub Actions bestanden. Keine Live-Serveränderung.

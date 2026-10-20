@@ -1,4 +1,6 @@
-# Virtualmin FTPS VirtualHosts 0.1.9 — Beta
+# Virtualmin FTPS VirtualHosts 0.1.10 — Beta
+
+Domainbezogene FTP-Logs: [DOMAIN-LOGS.md](docs/DOMAIN-LOGS.md).
 
 Eigenständiges Webmin-/Virtualmin-Feature-Plugin für **Virtualmin GPL 8.3.0**, **Debian 12** und **ProFTPD 1.3.8**. Keine Änderungen an Virtualmin-Kerndateien. Keine automatische Übernahme vorhandener FTP-VirtualHosts.
 
@@ -8,7 +10,7 @@ Eigenständiges Webmin-/Virtualmin-Feature-Plugin für **Virtualmin GPL 8.3.0**,
 
 ## Installation über den Webmin-Uploader
 
-Dafür die Datei **`virtualmin-ftps-0.1.9.wbm.gz`** verwenden, nicht das vollständige `.tar.gz`-Entwicklerpaket. Das native Archiv enthält direkt `virtualmin-ftps/module.info`; der Modulordner hat keine Versionsnummer im Namen.
+Dafür die Datei **`virtualmin-ftps-0.1.10.wbm.gz`** verwenden, nicht das vollständige `.tar.gz`-Entwicklerpaket. Das native Archiv enthält direkt `virtualmin-ftps/module.info`; der Modulordner hat keine Versionsnummer im Namen.
 
 Unter **Webmin → Webmin Configuration → Webmin Modules → Install** das `.wbm.gz` als lokale Datei auswählen. Der Upload installiert das eigenständige Modul, richtet aber noch keinen FTPS-Host und keinen Dienst ein. Danach einmalig als root den Prüfmodus vorbereiten:
 
@@ -23,11 +25,11 @@ Anschließend das Plugin wie unten beschrieben unter Virtualmins **Features and 
 
 ## Alternative: vollständiges Installationsarchiv, zuerst nur prüfen
 
-Archiv beispielsweise nach `/root/virtualmin-ftps-0.1.9.tar.gz` kopieren und als root ausführen:
+Archiv beispielsweise nach `/root/virtualmin-ftps-0.1.10.tar.gz` kopieren und als root ausführen:
 
 ```bash
-tar -xzf /root/virtualmin-ftps-0.1.9.tar.gz -C /root
-cd /root/virtualmin-ftps-0.1.9
+tar -xzf /root/virtualmin-ftps-0.1.10.tar.gz -C /root
+cd /root/virtualmin-ftps-0.1.10
 python3 manage.py check --webmin-root /opt/webmin-2.670
 ```
 
