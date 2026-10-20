@@ -1,0 +1,12 @@
+SHA-256 of audited files in supplied archive (no source files redistributed)
+79032def851bf7e3a8732d58cd9a54d72644750246df4e361e92463cde9a7d30  opt/webmin-2.670/virtual-server/module.info
+df46c8353c28566b7968a8b574444266f51b1b39721b6ee4a4060c0be230697c  opt/webmin-2.670/virtual-server/virtual_feature_api.pl
+5e2084569ab0150afb4bbb2161470d74cfe63f83545fb8f506b53b29c16d17de  opt/webmin-2.670/virtual-server/virtual-server-lib.pl
+47dc603c16cdf98be6a2f43c627175d1544cf2e6a1d56e9dabffd560fe8bf8b8  opt/webmin-2.670/virtual-server/virtual-server-lib-funcs.pl
+3b8fb6e1dfc4e9706b72304e86933e3db18989b5775a05175026cd0de4c70ed7  opt/webmin-2.670/virtual-server/edit_domain.cgi
+2afb97c9a1cd343ab76fea400103e68a1a474733e260f250037591c4426f2f0e  opt/webmin-2.670/virtual-server/edit_newfeatures.cgi
+a2d5f312fd6dece65f803f6633286d1b86ba4923c5f9bb1ce4ad1297696590d7  opt/webmin-2.670/virtual-server/set-global-feature.pl
+6775abe40834af8f8a9e232c7ffb136dad777c47903dfcc720c8be302aee8df3  opt/webmin-2.670/virtual-server/save_newips.cgi
+38929d22670ef5c6b981770099750bb4576b987b5cb3a0665aa0fe2f22fe4b74  opt/webmin-2.670/virtual-server/dynip-lib.pl
+4dd253f9bbec29b7a0fd7c78b8c542429d6bc211edb50b346482a261d8546fb0  opt/webmin-2.670/virtual-server/feature-ssl.pl
+d2ae3a226fae23b637215483bf5bf4711d10679b092ebacaec5ec4df162c5c48  opt/webmin-2.670/proftpd/proftpd-lib.pl
