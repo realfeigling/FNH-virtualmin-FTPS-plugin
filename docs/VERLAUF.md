@@ -82,3 +82,7 @@ Ergänzende Nutzeranforderung: individuelle Rotation je virtuellem FTP-Host übe
 ## 0.1.22 Beta – Webmin-Einstellung und Kodierung
 
 Auf Nutzerwunsch native Webmin-Formulare für globale und hostbezogene Logrotation ergänzt. Screenshot zeigte FTPS pr�fen; Menüausgabe auf korrekte UTF-8-Bytes korrigiert. Hauptadministrator-ACL, POST mit sitzungsgebundenem Token, Schutz vor parallelem Überschreiben, geprüfte Regel und Wiederherstellung bei Schreibfehlern. Kein Zugriff auf den Live-Server.
+
+## 0.1.23 Beta – POST-Prüfung
+
+Nutzer meldet POST-Fehler im Webmin-Formular. Ursprüngliche HTTP-Methode vor Modulinitialisierung sichern; Regressionstests simulieren bereinigte Umgebung und prüfen sowohl Erfolg als auch weiterhin gesperrte Schreibzugriffe. Nach Fehlern Einstellungsformular erneut anbieten.

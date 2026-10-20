@@ -23,3 +23,7 @@ perl /opt/webmin-2.670/virtualmin-ftps/collect.pl --refresh-menu
 ```
 
 Keine Live-Serveränderung beim Paketbau. copytruncate und seine dokumentierte mögliche kurze Protokollierungslücke bleiben unverändert.
+
+## Korrektur 0.1.23
+
+Die ursprüngliche HTTP-Methode wird vor dem Laden weiterer Module gesichert. Gültige Formular-POSTs bleiben nach bereinigter CGI-Umgebung erkennbar; GET-Schreibzugriffe und falsche Sitzungstoken bleiben gesperrt.

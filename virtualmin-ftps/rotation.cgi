@@ -1,14 +1,16 @@
 #!/usr/bin/perl
 use utf8;
+# Preserve transport metadata before module initialization can sanitize %ENV.
+my $request_method = $ENV{'REQUEST_METHOD'} || '';
 require './virtualmin-ftps-lib.pl';
-&ReadParse();
+&ReadParse(undef, $request_method);
 &ftps_rotation_admin();
 my $scope = $in{'dom'} || '';
 my $action = $in{'save'} ? 'save' : $in{'preview'} ? 'preview' : ''; 
 my ($message, $failure, $reply);
 eval {
     if ($action) {
-        &ftps_rotation_post($ENV{'REQUEST_METHOD'} || '', $in{'token'});
+        &ftps_rotation_post($request_method, $in{'token'});
         die "Ungültige Formularaktion.\n" if ($action !~ /^(preview|save)$/);
         my $r = &ftps_rotation_backend({ operation => $action, scope => $scope,
                      policy => &ftps_rotation_input(\%in, $scope),
@@ -20,13 +22,17 @@ eval {
     die "FTP-Host nicht gefunden.\n" if ($scope && !$reply->{'domains'}->{$scope});
 };
 $failure = $@;
+if ($failure && !$reply) {
+    eval { $reply = &ftps_rotation_backend({ operation => 'read' }); };
+    $failure .= $@ if ($@);
+}
 $main::force_charset = 'UTF-8';
 &ui_print_header(undef, 'FTP-Logrotation (Beta)', '', undef, 1, 1);
 my $html = '<div style="max-width:960px"><p>Gemeinsame Vorgaben oder einen einzelnen FTP-Host auswählen.</p>';
 if ($failure) {
     $html .= '<p role="alert">'.&html_escape($failure).'</p>';
 }
-else {
+if ($reply && (!$scope || $reply->{'domains'}->{$scope})) {
     $html .= '<p role="status">'.&html_escape($message).'</p>' if ($message);
     $html .= &ui_form_start('rotation.cgi', 'get');
     my @choices = (['', 'Gemeinsame Vorgaben für alle FTP-Hosts']);
