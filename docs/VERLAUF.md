@@ -76,3 +76,5 @@ Auf Nutzerwunsch geprüfte Logrotate-Konfiguration für geschützte FTP-Logs erg
 ## 0.1.21 Beta – Konfigurierbare Rotation
 
 Auf Nutzerwunsch Intervall, Archivanzahl und optionale Größenrotation als logrotate-Abschnitt in engine.json ergänzt. Neuer Standard weekly/52 ohne maxsize. Änderungen werden über geprüften install-logrotate-Aufruf übernommen; vorhandene Konfigurationen beim Paket-Update bleiben erhalten.
+
+Ergänzende Nutzeranforderung: individuelle Rotation je virtuellem FTP-Host über Domain-ID-Overrides in logrotate.domains; neue Hosts erben Standardwerte. Echte Tests prüfen getrennte Aufbewahrung ohne doppelte Rotation.

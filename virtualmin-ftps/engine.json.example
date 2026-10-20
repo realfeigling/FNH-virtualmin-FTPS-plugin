@@ -13,6 +13,7 @@
   "logrotate": {
     "interval": "weekly",
     "rotate": 52,
-    "maxsize": null
+    "maxsize": null,
+    "domains": {}
   }
 }

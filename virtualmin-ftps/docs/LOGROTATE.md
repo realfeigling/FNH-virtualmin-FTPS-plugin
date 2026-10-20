@@ -34,3 +34,27 @@ copytruncate erhält geöffnete FTP-Dateien, kann aber zwischen Kopieren und Kü
 Quellen: https://github.com/logrotate/logrotate/blob/main/logrotate.8.in und https://github.com/proftpd/www.proftpd.org/blob/master/docs/howto/Logging.html
 
 Keine Live-Serverkonfiguration beim Paketbau geändert.
+
+## Eigene Einstellungen je virtuellem FTP-Host
+
+Unter domains lassen sich anhand der stabilen Virtualmin-Domain-ID eigene Werte festlegen. Die Regeln gelten jeweils für ftp.log und xferlog dieses Hosts. Nicht angegebene Werte werden vom gemeinsamen Standard geerbt; maxsize: null schaltet eine geerbte Größenrotation aus.
+
+```json
+"logrotate": {
+  "interval": "weekly",
+  "rotate": 52,
+  "maxsize": null,
+  "domains": {
+    "1792423871587556": {
+      "interval": "daily",
+      "rotate": 365
+    },
+    "17921619452822993": {
+      "interval": "monthly",
+      "rotate": 12
+    }
+  }
+}
+```
+
+Damit erhält web4test.beck-mann.de im Beispiel tägliche und artists.de monatliche Archive. Die IDs vor Verwendung mit der eigenen Virtualmin-Konfiguration abgleichen. Andere Hosts – auch neue – verwenden automatisch den gemeinsamen Standard. Nach Änderungen check-logrotate und install-logrotate ausführen. Eigene Regeln stehen vor der Standardregel und verhindern doppelte Rotation über ignoreduplicates (Logrotate ab 3.21, enthalten in Debian 12).

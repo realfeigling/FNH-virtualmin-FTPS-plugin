@@ -286,10 +286,20 @@ LOGROTATE_FILE = Path('/etc/logrotate.d/virtualmin-ftps')
 LOGROTATE_MARKER = '# Managed by virtualmin-ftps logrotate\n'
 
 
-def logrotate_policy(c):
+def logrotate_policy(c, ident=None):
     policy = c.get('logrotate', {})
-    if not isinstance(policy, dict) or set(policy) - {'interval', 'rotate', 'maxsize'}:
+    if not isinstance(policy, dict) or set(policy) - {'interval', 'rotate', 'maxsize', 'domains'}:
         raise ValueError('Unknown logrotate settings')
+    overrides = policy.get('domains', {})
+    if not isinstance(overrides, dict):
+        raise ValueError('Logrotate domains must be an object keyed by domain ID')
+    base = {k: v for k, v in policy.items() if k != 'domains'}
+    for key, value in overrides.items():
+        if (not isinstance(key, str) or not re.fullmatch(r'[0-9]{1,40}', key) or
+                not isinstance(value, dict) or set(value) - {'interval', 'rotate', 'maxsize'}):
+            raise ValueError('Invalid domain logrotate override')
+        logrotate_policy({'logrotate': dict(base, **value)})
+    policy = dict(base, **overrides.get(ident, {}))
     interval = policy.get('interval', 'weekly')
     count = policy.get('rotate', 52)
     size = policy.get('maxsize')
@@ -313,13 +323,22 @@ def logrotate_config(c):
         if child.name[:1].isdigit():
             engine.trusted(child, directory=True, log_path=True)
     root = engine.resolve_log_source(root)
-    # Exact filenames only: never rotate archives or customer home directories.
-    return (LOGROTATE_MARKER +
-            f'"{root}/[0-9]*/ftp.log" "{root}/[0-9]*/xferlog" {{\n'
-            f'    {interval}\n    rotate {count}\n' +
-            (f'    maxsize {size}\n' if size else '') +
-            '    missingok\n    notifempty\n    compress\n    delaycompress\n'
-            '    copytruncate\n    su root root\n}\n').encode()
+    def block(directory, values, duplicate_guard=False):
+        interval, count, size = values
+        return (f'"{directory}/ftp.log" "{directory}/xferlog" {{\n' +
+                ('    ignoreduplicates\n' if duplicate_guard else '') +
+                f'    {interval}\n    rotate {count}\n' +
+                (f'    maxsize {size}\n' if size else '') +
+                '    missingok\n    notifempty\n    compress\n    delaycompress\n'
+                '    copytruncate\n    su root root\n}\n')
+    data = LOGROTATE_MARKER
+    # Specific hosts first. Their ignoreduplicates flag suppresses later wildcard
+    # matches, while the wildcard automatically covers newly created domains.
+    overrides = c.get('logrotate', {}).get('domains', {})
+    for ident in sorted(overrides):
+        data += block(f'{root}/{ident}', logrotate_policy(c, ident), True)
+    data += block(f'{root}/[0-9]*', (interval, count, size))
+    return data.encode()
 
 
 def configure_logrotate(apply=False):

@@ -220,3 +220,27 @@ Sichtbare Prüfausgabe und Menübeschriftung verwenden echte Umlaute: „FTPS pr
 - Keine neue automatische Aktivierung, keine neuen Virtualmin-Hooks, keine Änderung am ProFTPD-Konfigurationsformat. Der Ownership-Header der verwalteten Datei bleibt zur Formatkompatibilität bei 0.1.0.
 
 Der Webmin-Uploader selbst wurde hier nicht ausgeführt. Die native Archivstruktur und die Einrichtungspfade sind lokal geprüft. Es gibt keinen unbestätigten automatischen Postinstall-Hook; die Einrichtung erfolgt ausdrücklich mit `setup`.
+
+## Eigene Einstellungen je virtuellem FTP-Host
+
+Unter domains lassen sich anhand der stabilen Virtualmin-Domain-ID eigene Werte festlegen. Die Regeln gelten jeweils für ftp.log und xferlog dieses Hosts. Nicht angegebene Werte werden vom gemeinsamen Standard geerbt; maxsize: null schaltet eine geerbte Größenrotation aus.
+
+```json
+"logrotate": {
+  "interval": "weekly",
+  "rotate": 52,
+  "maxsize": null,
+  "domains": {
+    "1792423871587556": {
+      "interval": "daily",
+      "rotate": 365
+    },
+    "17921619452822993": {
+      "interval": "monthly",
+      "rotate": 12
+    }
+  }
+}
+```
+
+Damit erhält web4test.beck-mann.de im Beispiel tägliche und artists.de monatliche Archive. Die IDs vor Verwendung mit der eigenen Virtualmin-Konfiguration abgleichen. Andere Hosts – auch neue – verwenden automatisch den gemeinsamen Standard. Nach Änderungen check-logrotate und install-logrotate ausführen. Eigene Regeln stehen vor der Standardregel und verhindern doppelte Rotation über ignoreduplicates (Logrotate ab 3.21, enthalten in Debian 12).

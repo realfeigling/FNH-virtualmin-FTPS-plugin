@@ -90,4 +90,33 @@ class LogRotation(unittest.TestCase):
         self.assertEqual(m.logrotate_policy({}),('weekly',52,None))
         self.assertEqual(m.logrotate_policy({'logrotate':{}}),('weekly',52,None))
 
+    def test_domain_policy_inherits_defaults_and_overrides_selected_fields(self):
+        c={'logrotate':{'interval':'weekly','rotate':52,'maxsize':'100M',
+                       'domains':{'1':{'interval':'daily','rotate':365,'maxsize':None}}}}
+        self.assertEqual(m.logrotate_policy(c,'1'),('daily',365,None))
+        self.assertEqual(m.logrotate_policy(c,'2'),('weekly',52,'100M'))
+
+    def test_bad_domain_override_rejected(self):
+        for domains in ([], {'../1':{}}, {'1':{'rotate':0}},
+                        {'1':{'postrotate':'command'}}, {'1':None}):
+            with self.subTest(domains=domains),self.assertRaises(ValueError):
+                m.logrotate_policy({'logrotate':{'domains':domains}})
+
+    def test_real_per_host_retention_without_duplicate_rotation(self):
+        self.prepare()
+        two=self.path.parent/'2';two.mkdir(mode=0o750);os.chown(two,0,self.user.pw_gid)
+        c=dict(self.c,logrotate={'interval':'weekly','rotate':5,
+                                'domains':{'1':{'interval':'daily','rotate':2}}})
+        conf=self.root/'per-host.conf';conf.write_bytes(m.logrotate_config(c))
+        for i in range(4):
+            for directory in (self.path,two):
+                for name in ('ftp.log','xferlog'):
+                    p=directory/name;p.write_text('event '+str(i)+'\n')
+                    os.chown(p,0,self.user.pw_gid);p.chmod(0o640)
+            self.rotate(conf)
+        self.assertTrue((self.path/'ftp.log.2.gz').exists())
+        self.assertFalse((self.path/'ftp.log.3.gz').exists())
+        self.assertTrue((two/'ftp.log.4.gz').exists())
+        self.assertFalse((self.path/'ftp.log.1.gz').exists())
+
 del ProtectedLogs
