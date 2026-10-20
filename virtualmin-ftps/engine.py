@@ -83,6 +83,14 @@ def trusted(path, directory=False, log_path=False):
             import grp, pwd
             group = grp.getgrgid(s.st_gid)
             if s.st_mode & 0o020:
+                import errno
+                try:
+                    os.getxattr(q, 'system.posix_acl_access', follow_symlinks=False)
+                except OSError as err:
+                    if err.errno not in (errno.ENODATA, errno.ENOTSUP):
+                        raise
+                else:
+                    raise ValueError('Review extended ACL on writable /var/log')
                 members = [u for u in pwd.getpwall()
                            if u.pw_gid == s.st_gid or u.pw_name in group.gr_mem]
                 if group.gr_name not in ('root', 'syslog', 'adm') or any(

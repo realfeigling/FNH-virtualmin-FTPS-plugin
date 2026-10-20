@@ -6,11 +6,11 @@ from unittest.mock import patch
 from test_domain_logs import e
 
 class LogRootTrust(unittest.TestCase):
-    def check(self, uid=104, group='syslog', mode=0o775, log_path=True):
+    def check(self, uid=104, group='syslog', mode=0o775, log_path=True, acl=False):
         def metadata(p):
             return NS(st_mode=stat.S_IFDIR | (mode if str(p)=='/var/log' else 0o755),
                       st_uid=0,st_gid=110)
-        with patch.object(Path,'lstat',metadata),patch('grp.getgrgid',return_value=NS(gr_name=group,gr_mem=['logger'])),patch('pwd.getpwall',return_value=[NS(pw_name='logger',pw_uid=uid,pw_gid=110)]):
+        with patch('os.getxattr', **({'return_value':b'acl'} if acl else {'side_effect':OSError(61,'No ACL')})),patch.object(Path,'lstat',metadata),patch('grp.getgrgid',return_value=NS(gr_name=group,gr_mem=['logger'])),patch('pwd.getpwall',return_value=[NS(pw_name='logger',pw_uid=uid,pw_gid=110)]):
             e.trusted('/var/log/virtualmin-ftps-logs',log_path=log_path)
 
     def test_system_logging_group_allowed(self): self.check()
@@ -22,3 +22,6 @@ class LogRootTrust(unittest.TestCase):
         with self.assertRaises(ValueError): self.check(mode=0o777)
     def test_general_trust_not_relaxed(self):
         with self.assertRaises(ValueError): self.check(log_path=False)
+
+    def test_extended_acl_requires_review(self):
+        with self.assertRaises(ValueError): self.check(acl=True)
