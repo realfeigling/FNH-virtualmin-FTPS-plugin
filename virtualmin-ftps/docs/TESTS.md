@@ -1,3 +1,7 @@
+# Prüfung 0.1.12 Beta
+
+20 Domain-/Migrations-Regressionstests und 4 Paketprüfungen sind eingerichtet. Drei neue Fälle prüfen die exakte Befundkonstellation (Server-Begrüßung bereits geändert, server_fqdn fehlt), Vorschau ohne Änderung, erfolgreiche Anwendung mit Zustand/Logs/AllowOverwrite, Wiederholbarkeit sowie Ablehnung veränderter Ports oder fremder Begrüßungsnamen. Ausführung und Ergebnisse: GitHub Actions. ProFTPD und Reload werden in den Transaktionstests simuliert; keine Live-Abnahme.
+
 # Prüfung 0.1.11 Beta
 
 17 Domain-/Migrations-Regressionstests und 4 Paketprüfungen sind für diese Version eingerichtet. Die neue Prüfung betrifft die Übernahme eines 0.1.10-Zustands, Vorschau ohne Änderung, AllowOverwrite in jedem Host, Wiederholbarkeit sowie Erhalt von Loginhalt und Logrechten. Ergebnisse siehe GitHub Actions. ProFTPD und Reload weiterhin simuliert; kein echter FTP-Upload oder Überschreiben einer Live-Datei.

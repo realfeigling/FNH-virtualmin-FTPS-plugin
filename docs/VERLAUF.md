@@ -36,3 +36,7 @@ Auf Wunsch werden ExtendedLog und TransferLog je VirtualHost unter dem jeweilige
 ## Ergänzung: Überschreiben, 0.1.11 Beta
 
 Gemeldet wurde 550 index.html: Overwrite permission denied. Dem Plugin fehlte AllowOverwrite on. Diese Regel wird für jeden verwalteten Host ergänzt, mit kontrollierter Migration vorhandener Zustände und Erhalt von Datei-/Benutzerrechten und Domain-Logs. Keine Live-Serveränderung oder Überschreiben einer Live-Datei.
+
+## Korrektur der Update-Übernahme, 0.1.12 Beta
+
+Die Nutzerausgabe zeigte: gespeicherter Server-FQDN fehlt, aktive Datei enthält bereits den Server-FQDN; ausschließlich ServerIdent-Zeilen weichen ab. Die bisherige Migration lehnte diese Konstellation ab. Die ausdrückliche Migration akzeptiert jetzt diese exakt bekannte Variante mit aktuell validiertem lokalen FQDN. Andere Änderungen bleiben gesperrt. Kein direktes Ändern von Live-Zustand oder Live-Konfiguration beim Paketbau.

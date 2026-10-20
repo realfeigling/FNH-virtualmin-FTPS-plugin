@@ -664,8 +664,18 @@ class Engine:
         expected_current = None
         if op == 'use-website-certificates':
             current = self.managed.read_bytes()
-            accepted = (render_state(state, self.c),
-                        render_state(state, self.c, legacy_login=True))
+            accepted = [render_state(state, self.c),
+                        render_state(state, self.c, legacy_login=True)]
+            if current not in accepted and 'server_fqdn' not in state:
+                # Older installs may already have the approved server greeting
+                # in the file but no identity in state. Accept ONLY an exact
+                # render with the currently validated local server FQDN.
+                identity = server_fqdn()
+                accepted.extend(render(
+                    state['domains'], self.c, legacy_login=legacy_login,
+                    identity=identity,
+                    allow_overwrite=state.get('allow_overwrite', False))
+                    for legacy_login in (False, True))
             if current not in accepted:
                 raise ValueError('Managed configuration drift; migration refuses foreign changes')
             expected_current = current

@@ -186,6 +186,50 @@ class DomainLogs(unittest.TestCase):
         self.assertEqual(log.stat().st_mode, before_mode)
         self.assertFalse(self.execute(True)['changed'])
 
+    def greeting_only_legacy_state(self, identity='server.example'):
+        state = self.state(legacy=True)
+        state.pop('server_fqdn')
+        (self.root / 'state.json').write_text(json.dumps(state))
+        self.engine.managed.write_bytes(e.render(
+            state['domains'], self.c, identity=identity, allow_overwrite=False))
+        return state
+
+    def test_legacy_server_greeting_without_state_migrates(self):
+        self.greeting_only_legacy_state()
+        before = self.engine.managed.read_bytes()
+        state_before = (self.root / 'state.json').read_bytes()
+        result = self.execute(False, operation='use-website-certificates')
+        self.assertTrue(result['changed'])
+        self.assertFalse(result['applied'])
+        self.assertEqual(self.engine.managed.read_bytes(), before)
+        self.assertEqual((self.root / 'state.json').read_bytes(), state_before)
+        self.assertFalse((self.home / 'logs').exists())
+        self.assertTrue(self.execute(True, operation='use-website-certificates')['applied'])
+        state = e.load_json(self.root / 'state.json')
+        self.assertEqual(state['server_fqdn'], 'server.example')
+        self.assertTrue(state['allow_overwrite'])
+        self.assertEqual(state['domains']['1']['home'], str(self.home))
+        self.assertIn(b'ExtendedLog', self.engine.managed.read_bytes())
+        self.assertIn(b'AllowOverwrite on', self.engine.managed.read_bytes())
+        self.assertFalse(self.execute(True, operation='use-website-certificates')['changed'])
+
+    def test_legacy_greeting_migration_rejects_other_changes(self):
+        self.greeting_only_legacy_state()
+        before = self.engine.managed.read_bytes().replace(
+            b'PassivePorts 49152 65534', b'PassivePorts 50000 50100')
+        self.engine.managed.write_bytes(before)
+        with self.assertRaisesRegex(ValueError, 'drift'):
+            self.execute(True, operation='use-website-certificates')
+        self.assertEqual(self.engine.managed.read_bytes(), before)
+        self.assertFalse((self.home / 'logs').exists())
+
+    def test_legacy_greeting_migration_rejects_other_hostname(self):
+        self.greeting_only_legacy_state(identity='other.example')
+        before = self.engine.managed.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'drift'):
+            self.execute(False, operation='use-website-certificates')
+        self.assertEqual(self.engine.managed.read_bytes(), before)
+
     def test_reload_failure_restores_config_and_state(self):
         old = self.state(legacy=True)
         before = self.engine.managed.read_bytes()
