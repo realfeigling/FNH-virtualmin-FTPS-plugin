@@ -1,3 +1,7 @@
+# Prüfung 0.1.11 Beta
+
+17 Domain-/Migrations-Regressionstests und 4 Paketprüfungen sind für diese Version eingerichtet. Die neue Prüfung betrifft die Übernahme eines 0.1.10-Zustands, Vorschau ohne Änderung, AllowOverwrite in jedem Host, Wiederholbarkeit sowie Erhalt von Loginhalt und Logrechten. Ergebnisse siehe GitHub Actions. ProFTPD und Reload weiterhin simuliert; kein echter FTP-Upload oder Überschreiben einer Live-Datei.
+
 # Prüfung 0.1.10 Beta
 
 20. Oktober 2026: 16 Python-Regressionstests auf GitHub Actions (Ubuntu, root-only Backend) bestanden. Geprüft: getrennte Domain-Logpfade, ungültige/fehlende Homes, sichere Dateianlage und Erhalt vorhandener Inhalte, Symlink-/Hardlink-/Rechteabwehr, doppelte Homes, Vorschau ohne Dateianlage, Übernahme alter Zustände, Wiederholbarkeit, Erhalt der Logs bei Domain-Löschung, Driftabwehr und Rücknahme bei simuliertem Reload-Fehler.

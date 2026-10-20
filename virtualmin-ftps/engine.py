@@ -431,10 +431,12 @@ def render_state(state, c, legacy_login=False):
     # checks even after the operating system hostname changes.
     return render(state['domains'], c, legacy_login=legacy_login,
                   legacy_ident='server_fqdn' not in state,
-                  identity=state.get('server_fqdn'))
+                  identity=state.get('server_fqdn'),
+                  allow_overwrite=state.get('allow_overwrite', False))
 
 
-def render(domains, c, legacy_login=False, legacy_ident=False, identity=None):
+def render(domains, c, legacy_login=False, legacy_ident=False, identity=None,
+           allow_overwrite=True):
     default = validate_default_domain(c.get('default_domain', ''))
     identity = identity if identity is not None else (None if legacy_ident or not domains else server_fqdn())
     out = [HEADER]
@@ -450,7 +452,8 @@ def render(domains, c, legacy_login=False, legacy_ident=False, identity=None):
         out += [f'# Domain ID {ident}\n<VirtualHost {ips}>\n',
                 f'ServerName "{d["dom"]}"\nServerAlias {d["dom"]}\n'
                 f'ServerIdent on "{d["dom"] if legacy_ident else identity}"\nDefaultServer {"on" if d["dom"] == default else "off"}\nPort 21\n',
-                'DefaultRoot ~\nAllowOverride off\n',
+                'DefaultRoot ~\nAllowOverride off\n' +
+                ('AllowOverwrite on\n' if allow_overwrite else ''),
                 f'PassivePorts {c["passive_ports"][0]} {c["passive_ports"][1]}\n',
                 'TLSEngine on\nTLSRequired on\nTLSProtocol TLSv1.2 TLSv1.3\nTLSVerifyClient off\n',
                 f'{prefix}CertificateFile {cert}\n',
@@ -652,7 +655,7 @@ class Engine:
                 raise ValueError('Managed configuration drift; repair refuses foreign changes')
             changed = current != corrected
             if apply and changed:
-                updated = dict(state, server_fqdn=identity)
+                updated = dict(state, server_fqdn=identity, allow_overwrite=True)
                 self.commit(updated, corrected, expected_current=current)
             elif not apply:
                 self.validate_config(corrected)
@@ -740,7 +743,7 @@ class Engine:
                 raise ValueError('; '.join(warnings))
             identity = server_fqdn() if domains else state.get('server_fqdn')
             data = render(domains, self.c, identity=identity)
-            newstate = {'domains': domains, 'pending': pending}
+            newstate = {'domains': domains, 'pending': pending, 'allow_overwrite': True}
             if identity is not None:
                 newstate['server_fqdn'] = identity
             if 'last_lifecycle' in state:

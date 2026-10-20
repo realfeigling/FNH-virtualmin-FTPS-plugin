@@ -58,6 +58,7 @@ class DomainLogs(unittest.TestCase):
             self.assertIn('ExtendedLog ' + d['home'] + '/logs/ftp.log ALL\n', block)
             self.assertIn('TransferLog ' + d['home'] + '/logs/xferlog\n', block)
         self.assertEqual(data.count('ServerIdent on "server.example"'), 2)
+        self.assertEqual(data.count('AllowOverwrite on\n'), 2)
         self.assertIn('ServerName "one.example"', data)
 
     def test_invalid_home(self):
@@ -167,6 +168,23 @@ class DomainLogs(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'drift'):
             self.execute(True)
         self.assertFalse((self.home / 'logs').exists())
+
+    def test_overwrite_migration_preserves_logs_and_permissions(self):
+        self.state()  # 0.1.10: logs exist, overwrite flag absent.
+        e.prepare_logs({'1': self.d})
+        log = self.home / 'logs/ftp.log'
+        log.write_text('keep records')
+        before_mode = log.stat().st_mode
+        before = self.engine.managed.read_bytes()
+        self.assertNotIn(b'AllowOverwrite', before)
+        self.assertTrue(self.execute(False)['changed'])
+        self.assertEqual(self.engine.managed.read_bytes(), before)
+        self.assertTrue(self.execute(True)['applied'])
+        self.assertIn(b'AllowOverwrite on\n', self.engine.managed.read_bytes())
+        self.assertTrue(e.load_json(self.root / 'state.json')['allow_overwrite'])
+        self.assertEqual(log.read_text(), 'keep records')
+        self.assertEqual(log.stat().st_mode, before_mode)
+        self.assertFalse(self.execute(True)['changed'])
 
     def test_reload_failure_restores_config_and_state(self):
         old = self.state(legacy=True)

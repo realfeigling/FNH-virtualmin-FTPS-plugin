@@ -1,18 +1,22 @@
 # FNH Virtualmin FTPS Plugin — Beta
 
-Version **0.1.10 Beta** für Virtualmin/Webmin und ProFTPD.
+Version **0.1.11 Beta** für Virtualmin/Webmin und ProFTPD.
 
 ## Download
 
-- [Installierbares Webmin-Paket](releases/0.1.10/virtualmin-ftps-0.1.10.wbm.gz)
-- [SHA-256-Prüfsumme](releases/0.1.10/virtualmin-ftps-0.1.10.wbm.gz.sha256)
-- [Änderungsübersicht](releases/0.1.10/AENDERUNGEN-0.1.10.md)
+- [Installierbares Webmin-Paket](releases/0.1.11/virtualmin-ftps-0.1.11.wbm.gz)
+- [SHA-256-Prüfsumme](releases/0.1.11/virtualmin-ftps-0.1.11.wbm.gz.sha256)
+- [Änderungsübersicht](releases/0.1.11/AENDERUNGEN-0.1.11.md)
 
 Das .wbm.gz-Paket über Webmin installieren. Ein bereits aktiver Abgleich-Timer kann nach Installation die neue ServerIdent-Begrüßung übernehmen. Keine erneute Einrichtung oder Aktivierung ohne Prüfung der bestehenden Installation.
 
 ## Domainbezogene Logs
 
 Jeder Host erhält ExtendedLog und TransferLog unter seinem Domain-Home. Fehlende Dateien werden beim Anwenden angelegt, vorhandene Einträge bleiben erhalten. [Details](virtualmin-ftps/docs/DOMAIN-LOGS.md).
+
+## Überschreiben vorhandener Dateien
+
+AllowOverwrite on ist für jeden verwalteten Host gesetzt. Die bisherigen Unix-Dateirechte bleiben maßgeblich. [Details](virtualmin-ftps/docs/OVERWRITE.md).
 
 ## Dokumentation
 

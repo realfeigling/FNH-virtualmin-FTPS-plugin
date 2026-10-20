@@ -32,3 +32,7 @@ Das Paket unter releases/0.1.9 wird über Webmin installiert. Ein bereits aktive
 ## Ergänzung: Domain-Logs, 0.1.10 Beta
 
 Auf Wunsch werden ExtendedLog und TransferLog je VirtualHost unter dem jeweiligen Domain-Home angelegt und dauerhaft gespeichert. Der Beispielpfad wird nicht fest übernommen. Sichere Dateianlage, Migration und Erhalt vorhandener Logs sind umgesetzt; 16 Regressionstests auf GitHub Actions bestanden. Keine Live-Serveränderung.
+
+## Ergänzung: Überschreiben, 0.1.11 Beta
+
+Gemeldet wurde 550 index.html: Overwrite permission denied. Dem Plugin fehlte AllowOverwrite on. Diese Regel wird für jeden verwalteten Host ergänzt, mit kontrollierter Migration vorhandener Zustände und Erhalt von Datei-/Benutzerrechten und Domain-Logs. Keine Live-Serveränderung oder Überschreiben einer Live-Datei.
