@@ -68,3 +68,7 @@ Auf Nutzerwunsch auf /var/log/virtualmin-ftps-logs umgestellt. Root-Eigentum, le
 ## 0.1.19 Beta – Systemverweis für /var/log
 
 Die Diagnose auf web4 zeigt /var/log -> /data/log; beide Eltern und das Ziel gehören root mit 0755. Die bisherige Ablehnung aller Verweise war die Ursache. Ausschließlich der geprüfte Systemverweis wird nun für Logs unterstützt, einschließlich FTP-Einhängung und historischer Übernahme.
+
+## 0.1.20 Beta – Logrotation
+
+Auf Nutzerwunsch geprüfte Logrotate-Konfiguration für geschützte FTP-Logs ergänzt. Einrichtung über manage.py install-logrotate; tägliche Rotation mit 14 Archiven und Erhalt laufender FTP-Dateideskriptoren. Kein Live-Serverzugriff.

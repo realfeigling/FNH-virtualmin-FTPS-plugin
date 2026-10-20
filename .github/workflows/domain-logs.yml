@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Logrotate dependency
+        run: command -v logrotate || (sudo apt-get update && sudo apt-get install -y logrotate)
       - name: Python syntax
         run: python3 -m py_compile virtualmin-ftps/engine.py virtualmin-ftps/manage.py virtualmin-ftps/log_views.py
       - name: Domain log tests (root-only backend)

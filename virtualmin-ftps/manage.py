@@ -281,14 +281,60 @@ def deactivate():
           'Domain feature flags remain in Virtualmin; do not re-enable the timer.')
 
 
+
+LOGROTATE_FILE = Path('/etc/logrotate.d/virtualmin-ftps')
+LOGROTATE_MARKER = '# Managed by virtualmin-ftps logrotate\n'
+
+
+def logrotate_config(c):
+    root = engine.effective_log_root(c)
+    engine.validate_home(root)
+    engine.trusted(Path(root).parent, directory=True, log_path=True)
+    engine.trusted(root, directory=True, log_path=True)
+    for child in Path(root).iterdir():
+        if child.name[:1].isdigit():
+            engine.trusted(child, directory=True, log_path=True)
+    root = engine.resolve_log_source(root)
+    # Exact filenames only: never rotate archives or customer home directories.
+    return (LOGROTATE_MARKER +
+            f'"{root}/[0-9]*/ftp.log" "{root}/[0-9]*/xferlog" {{\n'
+            '    daily\n    rotate 14\n    maxsize 100M\n'
+            '    missingok\n    notifempty\n    compress\n    delaycompress\n'
+            '    copytruncate\n    su root root\n}\n').encode()
+
+
+def configure_logrotate(apply=False):
+    c = get_config()
+    e = engine.Engine(c)
+    with e.lock():
+        engine.trusted('/usr/sbin/logrotate')
+        engine.trusted(LOGROTATE_FILE.parent, directory=True)
+        data = logrotate_config(c)
+        if LOGROTATE_FILE.exists() or LOGROTATE_FILE.is_symlink():
+            engine.trusted(LOGROTATE_FILE)
+            if not LOGROTATE_FILE.read_bytes().startswith(LOGROTATE_MARKER.encode()):
+                raise ValueError('Foreign logrotate configuration; refusing overwrite')
+        with tempfile.TemporaryDirectory(prefix='ftps-logrotate-') as tmp:
+            candidate = Path(tmp) / 'virtualmin-ftps'
+            candidate.write_bytes(data)
+            candidate.chmod(0o600)
+            engine.run(['/usr/sbin/logrotate', '--debug', str(candidate)])
+        if apply:
+            engine.atomic(LOGROTATE_FILE, data, 0o644)
+        print(data.decode(), end='')
+        print('Logrotate installed.' if apply else 'Logrotate preview checked; no rotation or installation.')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('action', choices=['check', 'install', 'setup', 'activate', 'freeze', 'rollback', 'deactivate', 'set-default-host'])
+    p.add_argument('action', choices=['check', 'install', 'setup', 'activate', 'freeze', 'rollback', 'deactivate', 'set-default-host', 'check-logrotate', 'install-logrotate'])
     p.add_argument('--webmin-root')
     p.add_argument('--domain', default='')
     a = p.parse_args()
     if os.geteuid() != 0:
         p.error('Run as root')
+    if a.action in ('check-logrotate', 'install-logrotate'):
+        return configure_logrotate(apply=a.action == 'install-logrotate')
     if a.action == 'set-default-host':
         return set_default_host(a.domain)
     if a.action in ('check', 'install', 'setup', 'activate'):

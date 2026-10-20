@@ -1,3 +1,3 @@
-# Prüfung 0.1.19 Beta
+# Prüfung 0.1.20 Beta
 
-Zusätzliche Tests prüfen den root-eigenen /var/log-Verweis, die unverändert strenge allgemeine Pfadprüfung, fremdes Link-Eigentum, unsichere Zielrechte, weitere Ziel-Verweise, historische Logübernahme und einen echten schreibgeschützten Bind-Mount über den Systemverweis. Die bisherigen 61 Tests laufen weiterhin.
+Zusätzlich zu den bisherigen 68 Prüfungen: echte Logrotate-Läufe mit weiter geöffnetem Schreiber, Inode-/Eigentümer-/Gruppen-/Moduserhalt, komprimierte Archive, Vorschau ohne Rotation, wiederholbare Installation und Schutz fremder Konfigurationen sowie Abweisung kundeneigener Logwurzeln.
