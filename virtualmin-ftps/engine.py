@@ -366,7 +366,7 @@ def log_paths(d):
 
 def effective_log_root(c):
     configured = c.get('log_root')
-    state = Path(c['state_dir'])
+    state = Path(c.get('state_dir', '/var/lib/virtualmin-ftps'))
     previous_default = str(state.parent / (state.name + '-logs'))
     if not configured or configured in ('/var/log/virtualmin-ftps', previous_default):
         return '/var/log/virtualmin-ftps-logs'
