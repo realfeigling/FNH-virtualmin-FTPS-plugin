@@ -1,0 +1,12 @@
+{
+  "mode": "dry-run",
+  "state_dir": "/var/lib/virtualmin-ftps",
+  "managed_file": "/etc/proftpd/virtualmin-ftps.conf",
+  "proftpd_conf": "/etc/proftpd/proftpd.conf",
+  "proftpd_bin": "/usr/sbin/proftpd",
+  "passive_ports": [
+    49152,
+    65534
+  ],
+  "default_domain": ""
+}
