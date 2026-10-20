@@ -81,4 +81,7 @@ if ($export) {
         utf8::encode($out) if (utf8::is_utf8($out));
     }
     print $out;
+    if ($apply && !$one) {
+        print &ftps_refresh_log_access();
+    }
 }

@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'virtualmin-ftps'))
 spec = importlib.util.spec_from_file_location('engine', ROOT / 'virtualmin-ftps/engine.py')
 e = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(e)
@@ -66,7 +67,7 @@ class ProtectedLogs(unittest.TestCase):
         with patch.object(e,'scan',return_value=('Port 0\nDefaultServer off\n',[],[],[],1)), \
              patch.object(e,'certificate',return_value=('RSA','same',False)), \
              patch.object(e,'server_fqdn',return_value='server.example'), \
-             patch.object(self.engine,'validate_config'),patch.object(self.engine,'reload'):
+             patch.object(self.engine,'validate_config'),patch.object(self.engine,'reload'), patch.object(e,'prepare_views',return_value=[]):
             return self.engine._execute(request,apply)
 
     def test_new_logs_root_owned_group_readable(self):

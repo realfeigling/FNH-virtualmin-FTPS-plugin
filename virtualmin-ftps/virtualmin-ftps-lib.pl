@@ -8,6 +8,7 @@ use Cwd qw(abs_path);
 &init_config();
 my $report_file = &module_root_directory('virtualmin-ftps').'/report-lib.pl';
 require $report_file;
+require &module_root_directory('virtualmin-ftps').'/log-ui-lib.pl';
 
 sub ftps_check_active_root
 {
@@ -130,6 +131,35 @@ my $report = JSON::PP->new->decode($result);
 die "Unerwartete Domain im Pruefbericht\n"
     if (($report->{'scope'}->{'id'} || '') ne $id);
 return &ftps_report_html($report);
+}
+
+sub ftps_refresh_log_access
+{
+&ftps_load_virtualmin();
+die "Root required\n" if ($< != 0);
+&virtual_server::require_acl();
+my %users = map { $_->{'name'} => 1 } &acl::list_users();
+my %domains;
+foreach my $d (&virtual_server::list_domains()) {
+    next if (!$d->{'virtualmin-ftps'});
+    my $owner = $d;
+    my %seen;
+    while ($owner->{'parent'}) {
+        die "Domain parent cycle\n" if ($seen{$owner->{'id'}}++);
+        $owner = &virtual_server::get_domain($owner->{'parent'});
+        die "Domain parent missing\n" if (!$owner);
+    }
+    next if (!$owner->{'webmin'} || !$users{$owner->{'user'}});
+    push(@{$domains{$owner->{'user'}}}, $d->{'id'});
+}
+foreach my $user (sort keys %domains) {
+    my %acl = (logs => 1, doms => join(' ', sort @{$domains{$user}}),
+               noconfig => 1);
+    &virtual_server::add_user_module_acl($user, 'virtualmin-ftps');
+    &save_module_acl(\%acl, $user, 'virtualmin-ftps');
+}
+&virtual_server::clear_links_cache();
+return "FTP-Log-Lesezugriffe und Menuecache aktualisiert.\n";
 }
 
 sub ftps_refresh_menu

@@ -1,3 +1,9 @@
+# Prüfung 0.1.17 Beta
+
+Zusätzlich zu den 30 bisherigen Datei-/Migrations-/Descriptor-/Paketprüfungen sind Tests für echte schreibgeschützte Bind-Mounts, Lesbarkeit innerhalb eines tatsächlichen Chroots unter Domain-UID/GID, verweigerte Lösch-/Schreibzugriffe, Unmount mit Erhalt der Originale, Vorschau ohne Mountpoint-Anlage, fremde Mounts, begrenzte Lese-API, Domain-/Modul-ACL-Abweisung vor dem Backend, HTML-Escaping sowie native Menülinks und feature_webmin-ACLs eingerichtet. Originale liegen außerhalb von /var/log; die alten automatischen Pfade werden gezielt umgestellt.
+
+Die Linux-Mount-/Chroot-Prüfungen laufen isoliert im CI. Virtualmin-Umgebung, ProFTPD-Syntaxprüfung und Reload sind weiterhin simuliert. Kein Browser-Theme-Test und keine Live-Abnahme des Zielservers. Ergebnisse siehe GitHub Actions.
+
 # Prüfung 0.1.16 Beta
 
 23 isolierte Domain-/Log-/Migrationstests, 3 Perl-Descriptor-/Python-Übergabeprüfungen und 4 Archivprüfungen sind eingerichtet. Geprüft werden root-Eigentum und Domain-Gruppenleserechte, ein tatsächlicher Prozess mit Domain-UID/GID beim Versuch zu löschen/umzubenennen/überschreiben (muss abgewiesen werden), lesbarer Loginhalt für die Domain-Gruppe, Quell-Schnappschüsse ohne Quellenänderung, Wiederholbarkeit ohne doppelte Inhalte, Vorschau ohne Dateianlage, Symlink-/Hardlink-/Rechteabwehr, Übernahme alter Home-Pfade und Server-Begrüßungen, Dateianlage bei unverändertem Abgleich, Driftabwehr und Rücknahme bei simuliertem Reload-Fehler.

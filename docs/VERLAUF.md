@@ -56,3 +56,7 @@ Die Anwendung traf auf eine reguläre Logdatei mit UID 0, GID 0 und 0644. Die bi
 ## Root-Logs mit Löschschutz, 0.1.16 Beta
 
 Der Nutzer änderte die Anforderung: FTP-Logs sollen root gehören, damit der Kunde sie nicht löschen kann. Root-Eigentum allein im kundenbeschreibbaren Home wäre unzureichend. Die aktive Protokollierung verwendet deshalb einen root-kontrollierten Verzeichnisbaum unter /var/log/virtualmin-ftps/DOMAIN-ID mit Domain-Gruppenleserechten. Vorhandene Home-Logs werden als Schnappschuss übernommen und nicht gelöscht. Ein Testprozess mit Domain-UID/GID prüft, dass Lesen gelingt und Löschen, Umbenennen sowie Schreiben abgewiesen werden. Kein Live-Serverzugriff beim Paketbau.
+
+## Kunden-Logs und Logs and Reports, 0.1.17 Beta
+
+Die /var/log-Elternprüfung scheiterte auf dem Zielserver. Gewünscht wurden unveränderte /var/log-Rechte, geschützte Logs mit Zugang unter Kunden-Logs und native Menüeinträge. Auf Rückfrage wurde direkter FTP-Zugriff innerhalb des Chroots ausdrücklich gewünscht. Die neue Ablage verwendet einen root-kontrollierten Bereich neben state_dir, eine schreibgeschützte Bind-Ansicht unter logs/ftps und domainbegrenzte Webmin-Leseansichten. Keine Live-Serveränderung beim Paketbau.

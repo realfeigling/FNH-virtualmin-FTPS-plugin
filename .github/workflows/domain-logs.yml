@@ -12,12 +12,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Python syntax
-        run: python3 -m py_compile virtualmin-ftps/engine.py virtualmin-ftps/manage.py
+        run: python3 -m py_compile virtualmin-ftps/engine.py virtualmin-ftps/manage.py virtualmin-ftps/log_views.py
       - name: Domain log tests (root-only backend)
         run: sudo python3 -m unittest discover -s tests -v
       - name: Perl syntax without Webmin runtime
         run: |
           perl -c virtualmin-ftps/index.cgi
           perl -c virtualmin-ftps/collect.pl
+          perl -c virtualmin-ftps/logs.cgi
+          perl -c virtualmin-ftps/log-ui-lib.pl
           perl -c virtualmin-ftps/report-lib.pl
           perl -c virtualmin-ftps/virtual_feature.pl

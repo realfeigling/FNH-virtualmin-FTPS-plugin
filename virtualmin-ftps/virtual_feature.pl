@@ -48,8 +48,29 @@ return $ok ? undef : "$@";
 sub feature_links
 {
 my ($d) = @_;
-return ({ mod => 'virtualmin-ftps', cat => 'server',
-          desc => 'FTPS prüfen', page => 'index.cgi?dom='.$d->{'id'} });
+&ftps_load_virtualmin();
+my @links;
+push(@links, { mod => 'virtualmin-ftps', cat => 'server',
+               desc => 'FTPS prüfen', page => 'index.cgi?dom='.$d->{'id'} })
+    if (&virtual_server::master_admin());
+if ($d->{'virtualmin-ftps'}) {
+    push(@links,
+         { mod => 'virtualmin-ftps', cat => 'logs', desc => 'FTP-Log',
+           page => 'logs.cgi?dom='.$d->{'id'}.'&log=ftp' },
+         { mod => 'virtualmin-ftps', cat => 'logs', desc => 'FTP-Transfer-Log',
+           page => 'logs.cgi?dom='.$d->{'id'}.'&log=transfer' });
+}
+return @links;
+}
+sub feature_webmin
+{
+my ($d, $all) = @_;
+my %ids = map { $_->{'id'} => 1 }
+          grep { $_->{'virtualmin-ftps'} && $_->{'id'} =~ /^\d{1,40}$/ }
+          ($d, @{$all || []});
+return () if (!keys %ids);
+return (['virtualmin-ftps', { logs => 1, doms => join(' ', sort keys %ids),
+                             noconfig => 1 }]);
 }
 sub feature_always_links
 {

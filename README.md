@@ -1,26 +1,9 @@
-# FNH Virtualmin FTPS Plugin — 0.1.16 Beta
+# FNH Virtualmin FTPS Plugin — 0.1.17 Beta
 
-FTPS-VirtualHosts für Virtualmin/Webmin und ProFTPD mit Website-Zertifikaten, validiertem Server-FQDN, AllowOverride on und AllowOverwrite on.
+[Installationspaket](releases/0.1.17/virtualmin-ftps-0.1.17.wbm.gz) · [SHA-256](releases/0.1.17/virtualmin-ftps-0.1.17.wbm.gz.sha256) · [Änderungen](releases/0.1.17/AENDERUNGEN-0.1.17.md)
 
-## Download
+Geschützte root-eigene Originale unter /var/lib/virtualmin-ftps-logs/DOMAIN-ID; /var/log bleibt unverändert. Direkte schreibgeschützte FTP-Ansicht unter Domain-Home/logs/ftps sowie FTP-Log und FTP-Transfer-Log unter Logs and Reports. Keine kundenseitige Funktion zum Löschen oder Leeren. AllowOverride on und AllowOverwrite on bleiben für Kundendateien enthalten.
 
-- [Installationspaket](releases/0.1.16/virtualmin-ftps-0.1.16.wbm.gz)
-- [SHA-256](releases/0.1.16/virtualmin-ftps-0.1.16.wbm.gz.sha256)
-- [Änderungen](releases/0.1.16/AENDERUNGEN-0.1.16.md)
+[Installation, Vorschau, Anwendung und Mount-Voraussetzungen](virtualmin-ftps/docs/DOMAIN-LOGS.md) · [Plugin-Dokumentation](virtualmin-ftps/README.md) · [Prüfbericht](virtualmin-ftps/docs/TESTS.md) · [Verlauf](docs/VERLAUF.md) · [Lizenz](virtualmin-ftps/LICENSE)
 
-## Root-Logs mit Löschschutz
-
-Aktive Logs liegen unter `/var/log/virtualmin-ftps/DOMAIN-ID/`. Dateien und Verzeichnisse gehören root; die jeweilige Domain-Gruppe hat Leserechte. Kunden können die aktiven Logs weder löschen, umbenennen noch überschreiben. Alle Vorfahren des Zielbereichs müssen root kontrollieren und dürfen für Gruppe/Andere nicht beschreibbar sein.
-
-Die bisherigen Home-Logs werden beim ersten Anlegen der geschützten Zieldateien als Schnappschuss übernommen. Quellen bleiben unverändert. Alte FTP-Sitzungen können noch in alte geöffnete Dateien schreiben; neue Verbindungen nutzen nach erfolgreicher Umstellung die geschützten Logs. [Migration, Rücknahme und Rotation](virtualmin-ftps/docs/DOMAIN-LOGS.md).
-
-## Installation und Prüfung
-
-Das .wbm.gz über Webmin installieren. Ein bereits aktiver Timer kann danach automatisch abgleichen. [Vorschau und Anwendung](virtualmin-ftps/docs/OWNERSHIP-UPDATE.md). Der Paketbau verändert keine Live-Serverdateien.
-
-- [Plugin-Dokumentation](virtualmin-ftps/README.md)
-- [Arbeitsverlauf](docs/VERLAUF.md)
-- [Prüfbericht](virtualmin-ftps/docs/TESTS.md)
-- [Versionsverlauf](virtualmin-ftps/docs/CHANGES.md)
-
-Beta: automatisierte Datei-/Migrationsprüfungen ersetzen keinen echten Webmin-/ProFTPD-/FTPS-Livetest. Lizenz: [LICENSE](virtualmin-ftps/LICENSE).
+Nach Installation kann ein aktiver Timer abgleichen. Nach Neustarts stellt derselbe angewendete Abgleich die FTP-Ansichten wieder her; ohne aktiven Timer ist er manuell nötig. Paketbau und CI verändern keine Live-Serverdateien.

@@ -1,3 +1,4 @@
+import sys
 import importlib.util
 import json
 from pathlib import Path
@@ -5,6 +6,7 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'virtualmin-ftps'))
 spec = importlib.util.spec_from_file_location('descriptor_engine', ROOT / 'virtualmin-ftps/engine.py')
 engine = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(engine)

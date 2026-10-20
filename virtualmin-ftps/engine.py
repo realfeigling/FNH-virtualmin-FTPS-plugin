@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from log_views import prepare_views, unmount_view
 
 HEADER = '# Managed by virtualmin-ftps 0.1.0; edit via Virtualmin only.\n'
 MODULE = 'virtualmin-ftps'
@@ -350,10 +351,18 @@ def log_paths(d):
     return (directory + '/ftp.log', directory + '/xferlog')
 
 
+def effective_log_root(c):
+    configured = c.get('log_root')
+    if not configured or configured == '/var/log/virtualmin-ftps':
+        state = Path(c['state_dir'])
+        return str(state.parent / (state.name + '-logs'))
+    return configured
+
+
 def protected_log_dir(ident, c):
     if not re.fullmatch(r'[0-9]{1,40}', str(ident)):
         raise ValueError('Invalid domain ID for log directory')
-    root = c.get('log_root', '/var/log/virtualmin-ftps')
+    root = effective_log_root(c)
     validate_home(root)
     return str(Path(root) / str(ident))
 
@@ -395,7 +404,7 @@ def prepare_logs(domains, c, apply=True, old_domains=None):
     import grp
     if not domains:
         return
-    root = Path(c.get('log_root', '/var/log/virtualmin-ftps'))
+    root = Path(effective_log_root(c))
     validate_home(str(root))
     trusted(root.parent, directory=True)
     if not root.exists() and apply:
@@ -554,11 +563,18 @@ class Engine:
         run(['/usr/bin/systemctl', 'is-active', '--quiet', 'proftpd.service'])
 
     def restore(self, old):
+        current = self.read_state()
+        for ident, d in current['domains'].items():
+            previous = old['state'].get('domains', {}).get(ident, {})
+            if d.get('log_view') and (d.get('log_view') != previous.get('log_view') or
+                                      d.get('log_dir') != previous.get('log_dir')):
+                unmount_view(d)
         data = base64.b64decode(old['config'])
         self.validate_config(data)
         atomic(self.managed, data, 0o600)
         atomic(self.root / 'state.json', json_bytes(old['state']))
         self.reload()
+        prepare_views(old['state'].get('domains', {}))
 
     @contextlib.contextmanager
     def lock(self):
@@ -589,12 +605,16 @@ class Engine:
         self.validate_config(data)
         old = {'state': oldstate, 'config': base64.b64encode(current).decode()}
         atomic(self.root / 'journal.json', json_bytes(old))
+        mounted = []
         try:
+            mounted = prepare_views(state['domains'])
             atomic(self.managed, data)
             self.reload()
             atomic(self.root / 'state.json', json_bytes(state))
             atomic(self.root / 'previous.json', json_bytes(old))
         except BaseException as original:
+            for d in reversed(mounted):
+                unmount_view(d)
             try:
                 self.restore(old)
                 (self.root / 'journal.json').unlink()
@@ -606,6 +626,10 @@ class Engine:
 
     def execute(self, request, apply=False):
         op = request['operation']
+        if op == 'read-log':
+            if apply:
+                raise ValueError('Log viewing is read-only')
+            return self.read_log(request)
         if op == 'inspect':
             if apply:
                 raise ValueError('Domain inspection is read-only')
@@ -624,6 +648,37 @@ class Engine:
                 return self._execute(request, True)
         # Dry runs do not create locks, state, managed files or issue reloads.
         return self._execute(request, False)
+
+    def read_log(self, request):
+        if set(request) != {'operation', 'id', 'log'}:
+            raise ValueError('Unexpected log request fields')
+        ident, name = str(request['id']), request['log']
+        if not re.fullmatch(r'[0-9]{1,40}', ident) or name not in ('ftp', 'transfer'):
+            raise ValueError('Invalid domain or log selector')
+        d = self.read_state()['domains'].get(ident)
+        if not d or not d.get('log_dir'):
+            raise ValueError('Protected logs are not yet configured for this domain')
+        directory = Path(d['log_dir'])
+        trusted(directory, directory=True)
+        path = directory / ('ftp.log' if name == 'ftp' else 'xferlog')
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            st = os.fstat(fd)
+            import grp
+            if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or st.st_uid != 0 or
+                    st.st_gid != grp.getgrnam(d['group']).gr_gid or st.st_mode & 0o022):
+                raise ValueError('Unsafe protected log')
+            start = max(0, st.st_size - 65536)
+            os.lseek(fd, start, os.SEEK_SET)
+            data = os.read(fd, 65536)
+            if start:
+                data = data.split(b'\n', 1)[-1]
+            lines = data.decode('utf-8', errors='replace').splitlines()
+            return {'operation': 'read-log', 'scope': {'id': ident, 'domain': d['dom']},
+                    'log': name, 'text': '\n'.join(lines[-200:]),
+                    'truncated': bool(start or len(lines) > 200)}
+        finally:
+            os.close(fd)
 
     def inspect(self, request):
         """Only validate the selected domain. No reconciliation, writes or reloads.
@@ -759,6 +814,8 @@ class Engine:
             ident = str(request['id'])
             if not re.fullmatch(r'[0-9]{1,40}', ident):
                 raise ValueError('Invalid domain ID')
+            if apply and ident in domains:
+                unmount_view(domains[ident])
             domains.pop(ident, None)
             pending.pop(ident, None)
             targets = []
@@ -810,7 +867,8 @@ class Engine:
             # Deletion remains possible even if the site's primary TLS is broken.
             if apply and op != 'delete' and domains and warnings:
                 raise ValueError('; '.join(warnings))
-            domains = {ident: dict(d, log_dir=protected_log_dir(ident, self.c))
+            domains = {ident: dict(d, log_dir=protected_log_dir(ident, self.c),
+                                               log_view=str(Path(d['home']) / 'logs/ftps'))
                        for ident, d in domains.items()}
             identity = server_fqdn() if domains else state.get('server_fqdn')
             data = render(domains, self.c, identity=identity)
@@ -827,8 +885,10 @@ class Engine:
                 self.commit(newstate, data, expected_current=expected_current)
             elif apply:
                 prepare_logs(domains, self.c, old_domains=state['domains'])
+                prepare_views(domains)
             elif not apply:
                 prepare_logs(domains, self.c, apply=False, old_domains=state['domains'])
+                prepare_views(domains, apply=False)
                 if count == 1:
                     self.validate_config(data)
             return {'operation': op, 'applied': bool(apply and changed),
