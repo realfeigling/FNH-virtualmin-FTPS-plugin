@@ -86,3 +86,7 @@ Auf Nutzerwunsch native Webmin-Formulare für globale und hostbezogene Logrotati
 ## 0.1.23 Beta – POST-Prüfung
 
 Nutzer meldet POST-Fehler im Webmin-Formular. Ursprüngliche HTTP-Methode vor Modulinitialisierung sichern; Regressionstests simulieren bereinigte Umgebung und prüfen sowohl Erfolg als auch weiterhin gesperrte Schreibzugriffe. Nach Fehlern Einstellungsformular erneut anbieten.
+
+## 0.1.24 Beta – Ursache im AJAX-Formularablauf
+
+POST-Meldung besteht trotz gesicherter Methode weiter. Nutzer bestätigt unveränderte Browseradresse. Authentic-Quellcode get_pjax_type wählt bei stringförmiger Zieladresse die Methode des ersten passenden sichtbaren Formulars. Hostauswahl-GET und Speicher-POST hatten dasselbe Ziel. Umstellung auf genau ein POST-Formular, getrenntes Bearbeitungsziel und explizite reine Auswahlaktion. Neue HTML-/Transporttests.

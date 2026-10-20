@@ -2,6 +2,7 @@ import json
 import os
 import hmac
 import hashlib
+from html.parser import HTMLParser
 from pathlib import Path
 import subprocess
 import tempfile
@@ -25,7 +26,7 @@ sub ui_print_footer {print '<footer data-writes="'.$writes.'">Webmin</footer>';}
 sub ui_form_start {return '<form action="'.$_[0].'" method="'.$_[1].'">';}
 sub ui_form_end {my($bs)=@_;return join('',map {'<button name="'.$_->[0].'">'.$_->[1].'</button>'} @{$bs||[]}).'</form>';}
 sub ui_select {my($n,$v,$choices)=@_;return '<select name="'.$n.'">'.join('',map {'<option value="'.html_escape($_->[0]).'"'.($_->[0] eq $v?' selected':'').'>'.html_escape($_->[1]).'</option>'} @$choices).'</select>';}
-sub ui_submit {return '<input type="submit" value="'.html_escape($_[0]).'">';}
+sub ui_submit {return '<input type="submit" name="'.html_escape($_[1]).'" value="'.html_escape($_[0]).'">';}
 sub ui_hidden {return '<input type="hidden" name="'.$_[0].'" value="'.html_escape($_[1]).'">';}
 sub ui_table_start {return '<table>';}
 sub ui_table_end {return '</table>';}
@@ -75,3 +76,39 @@ class RotationPage(unittest.TestCase):
         self.assertIn('Ungültiges Formular',html)
         self.assertIn('data-writes="0"',html)
         self.assertIn('name="save"',html)
+
+    def test_single_post_form_for_authentic_ajax_method_detection(self):
+        class Forms(HTMLParser):
+            def __init__(self):super().__init__();self.forms=[];self.active=None
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs)
+                if tag=='form':
+                    assert self.active is None, 'nested forms'
+                    self.active={'attributes':attrs,'fields':[]};self.forms.append(self.active)
+                elif self.active is not None and tag in ('input','button','select'):
+                    self.active['fields'].append(attrs.get('name'))
+            def handle_endtag(self,tag):
+                if tag=='form':self.active=None
+        parser=Forms();parser.feed(self.page())
+        self.assertEqual(len(parser.forms),1)
+        form=parser.forms[0]
+        self.assertEqual(form['attributes'].get('action'),'rotation.cgi')
+        self.assertEqual(form['attributes'].get('method'),'post')
+        self.assertTrue({'host','show','dom','token','revision','rotate','preview','save'} <= set(form['fields']))
+        # Authentic get_pjax_type(string URL) uses the first matching form's
+        # method. Exercise that transport selection, not a hard-coded POST.
+        html=self.submit(method=form['attributes']['method'].upper())
+        self.assertIn('data-writes="1"',html)
+
+    def test_show_selects_host_without_writing(self):
+        html=self.submit(show='Anzeigen',host='1',dom='')
+        self.assertIn('Zeitplan für one.example&lt;script&gt;',html)
+        self.assertIn('name="dom" value="1"',html)
+        self.assertIn('data-writes="0"',html)
+
+    def test_selector_change_alone_does_not_retarget_save(self):
+        html=self.submit(host='1',dom='')
+        self.assertIn('Gemeinsamer Zeitplan',html)
+        self.assertNotIn('Zeitplan für one.example',html)
+        self.assertIn('name="dom" value=""',html)
+        self.assertIn('data-writes="1"',html)

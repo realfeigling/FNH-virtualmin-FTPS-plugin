@@ -27,3 +27,7 @@ Keine Live-Serveränderung beim Paketbau. copytruncate und seine dokumentierte m
 ## Korrektur 0.1.23
 
 Die ursprüngliche HTTP-Methode wird vor dem Laden weiterer Module gesichert. Gültige Formular-POSTs bleiben nach bereinigter CGI-Umgebung erkennbar; GET-Schreibzugriffe und falsche Sitzungstoken bleiben gesperrt.
+
+## Korrektur 0.1.24 für Authentic Theme
+
+Genau ein POST-Formular vermeidet die Methodenverwechslung bei gleicher Formular-Zieladresse. „Anzeigen“ wechselt die Ansicht; Speichern betrifft immer den aktuell angezeigten Host. Nach Update den Menüeintrag frisch öffnen.

@@ -5,8 +5,10 @@ my $request_method = $ENV{'REQUEST_METHOD'} || '';
 require './virtualmin-ftps-lib.pl';
 &ReadParse(undef, $request_method);
 &ftps_rotation_admin();
-my $scope = $in{'dom'} || '';
-my $action = $in{'save'} ? 'save' : $in{'preview'} ? 'preview' : ''; 
+# One POST form for selection and editing; changing the selector alone must
+# never apply the currently displayed policy to a different host.
+my $scope = $in{'show'} ? ($in{'host'} || '') : ($in{'dom'} || '');
+my $action = $in{'show'} ? '' : $in{'save'} ? 'save' : $in{'preview'} ? 'preview' : '';  
 my ($message, $failure, $reply);
 eval {
     if ($action) {
@@ -34,14 +36,16 @@ if ($failure) {
 }
 if ($reply && (!$scope || $reply->{'domains'}->{$scope})) {
     $html .= '<p role="status">'.&html_escape($message).'</p>' if ($message);
-    $html .= &ui_form_start('rotation.cgi', 'get');
+    $html .= &ui_form_start('rotation.cgi', 'post').
+             &ui_hidden('dom', $scope).&ui_hidden('token', &ftps_rotation_token()).
+             &ui_hidden('revision', $reply->{'revision'});
     my @choices = (['', 'Gemeinsame Vorgaben für alle FTP-Hosts']);
     foreach my $id (sort { $reply->{'domains'}->{$a}->{'domain'} cmp
                           $reply->{'domains'}->{$b}->{'domain'} } keys %{$reply->{'domains'}}) {
         push(@choices, [$id, $reply->{'domains'}->{$id}->{'domain'}]);
     }
-    $html .= &ui_select('dom', $scope, \@choices).
-             &ui_submit('Anzeigen').&ui_form_end();
+    $html .= &ui_select('host', $scope, \@choices).
+             &ui_submit('Anzeigen', 'show');
     my ($policy, $inherit) = &ftps_rotation_policy($reply, $scope);
     if ($action && $action eq 'preview') {
         $inherit = $scope && $in{'inherit'} ? 1 : 0;
@@ -51,10 +55,7 @@ if ($reply && (!$scope || $reply->{'domains'}->{$scope})) {
     $html .= '<h2>'.&html_escape($title).'</h2>';
     $html .= '<p>Die Rotation ist noch nicht eingerichtet. Mit „Speichern und anwenden“ wird sie aktiviert.</p>'
         if (!$reply->{'installed'});
-    $html .= &ui_form_start('rotation.cgi', 'post').
-             &ui_hidden('dom', $scope).&ui_hidden('token', &ftps_rotation_token()).
-             &ui_hidden('revision', $reply->{'revision'}).
-             &ui_table_start('Aufbewahrung der FTP-Logs', undef, 2);
+    $html .= &ui_table_start('Aufbewahrung der FTP-Logs', undef, 2);
     if ($scope) {
         $html .= &ui_table_row('Gemeinsame Vorgaben',
                     &ui_checkbox('inherit', 1, 'Für diesen FTP-Host übernehmen', $inherit));

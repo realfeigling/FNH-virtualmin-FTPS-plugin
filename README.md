@@ -1,6 +1,6 @@
-# FNH Virtualmin FTPS Plugin — 0.1.23 Beta
+# FNH Virtualmin FTPS Plugin — 0.1.24 Beta
 
-[Installationspaket](releases/0.1.23/virtualmin-ftps-0.1.23.wbm.gz) · [SHA-256](releases/0.1.23/virtualmin-ftps-0.1.23.wbm.gz.sha256) · [Änderungen](releases/0.1.23/AENDERUNGEN-0.1.23.md)
+[Installationspaket](releases/0.1.24/virtualmin-ftps-0.1.24.wbm.gz) · [SHA-256](releases/0.1.24/virtualmin-ftps-0.1.24.wbm.gz.sha256) · [Änderungen](releases/0.1.24/AENDERUNGEN-0.1.24.md)
 
 Geschützte root-eigene Originale unter /var/log/virtualmin-ftps-logs/DOMAIN-ID; die Rechte von /var/log bleiben unverändert. Direkte schreibgeschützte FTP-Ansicht unter Domain-Home/logs/ftps sowie FTP-Log und FTP-Transfer-Log unter Logs and Reports. Keine kundenseitige Funktion zum Löschen oder Leeren. AllowOverride on und AllowOverwrite on bleiben für Kundendateien enthalten.
 
