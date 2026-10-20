@@ -21,6 +21,8 @@ jobs:
         run: |
           perl -c virtualmin-ftps/index.cgi
           perl -c virtualmin-ftps/collect.pl
+          perl -c virtualmin-ftps/rotation.cgi
+          perl -c virtualmin-ftps/rotation-ui-lib.pl
           perl -c virtualmin-ftps/logs.cgi
           perl -c virtualmin-ftps/log-ui-lib.pl
           perl -c virtualmin-ftps/report-lib.pl

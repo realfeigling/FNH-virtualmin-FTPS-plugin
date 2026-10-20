@@ -341,36 +341,116 @@ def logrotate_config(c):
     return data.encode()
 
 
+def checked_logrotate_data(c):
+    engine.trusted('/usr/sbin/logrotate')
+    engine.trusted(LOGROTATE_FILE.parent, directory=True)
+    data = logrotate_config(c)
+    if LOGROTATE_FILE.exists() or LOGROTATE_FILE.is_symlink():
+        engine.trusted(LOGROTATE_FILE)
+        if not LOGROTATE_FILE.read_bytes().startswith(LOGROTATE_MARKER.encode()):
+            raise ValueError('Foreign logrotate configuration; refusing overwrite')
+    with tempfile.TemporaryDirectory(prefix='ftps-logrotate-') as tmp:
+        candidate = Path(tmp) / 'virtualmin-ftps'
+        candidate.write_bytes(data)
+        candidate.chmod(0o600)
+        engine.run(['/usr/sbin/logrotate', '--debug', str(candidate)])
+    return data
+
+
 def configure_logrotate(apply=False):
     c = get_config()
     e = engine.Engine(c)
     with e.lock():
-        engine.trusted('/usr/sbin/logrotate')
-        engine.trusted(LOGROTATE_FILE.parent, directory=True)
-        data = logrotate_config(c)
-        if LOGROTATE_FILE.exists() or LOGROTATE_FILE.is_symlink():
-            engine.trusted(LOGROTATE_FILE)
-            if not LOGROTATE_FILE.read_bytes().startswith(LOGROTATE_MARKER.encode()):
-                raise ValueError('Foreign logrotate configuration; refusing overwrite')
-        with tempfile.TemporaryDirectory(prefix='ftps-logrotate-') as tmp:
-            candidate = Path(tmp) / 'virtualmin-ftps'
-            candidate.write_bytes(data)
-            candidate.chmod(0o600)
-            engine.run(['/usr/sbin/logrotate', '--debug', str(candidate)])
+        data = checked_logrotate_data(c)
         if apply:
             engine.atomic(LOGROTATE_FILE, data, 0o644)
         print(data.decode(), end='')
         print('Logrotate installed.' if apply else 'Logrotate preview checked; no rotation or installation.')
 
 
+def rotation_revision(c):
+    import hashlib
+    return hashlib.sha256(engine.json_bytes(c)).hexdigest()
+
+
+def rotation_api(request):
+    if not isinstance(request, dict):
+        raise ValueError('Invalid rotation request')
+    op = request.get('operation')
+    if op == 'read':
+        if set(request) != {'operation'}:
+            raise ValueError('Unexpected read fields')
+    elif op in ('preview', 'save'):
+        if set(request) != {'operation', 'scope', 'policy', 'revision'}:
+            raise ValueError('Unexpected rotation fields')
+    else:
+        raise ValueError('Unknown rotation operation')
+    c = get_config()
+    e = engine.Engine(c)
+    with e.lock():
+        if get_config() != c:
+            raise ValueError('Configuration changed; reload the page')
+        state = e.read_state()
+        domains = {i: {'id': i, 'domain': d['dom']}
+                   for i, d in state['domains'].items()}
+        logrotate_policy(c)
+        if op == 'read':
+            return {'rotation': c.get('logrotate', {}),
+                    'domains': domains, 'revision': rotation_revision(c),
+                    'installed': LOGROTATE_FILE.exists()}
+        scope = request['scope']
+        if not isinstance(scope, str) or (scope and scope not in domains):
+            raise ValueError('Unknown FTP host')
+        if request['revision'] != rotation_revision(c):
+            raise ValueError('Configuration changed; reload the page before saving')
+        policy = request['policy']
+        if policy is None and not scope:
+            raise ValueError('Global defaults cannot inherit')
+        if policy is not None:
+            if not isinstance(policy, dict) or set(policy) - {'interval', 'rotate', 'maxsize'}:
+                raise ValueError('Invalid rotation policy')
+            logrotate_policy({'logrotate': policy})
+        import copy
+        new = copy.deepcopy(c)
+        rotation = new.setdefault('logrotate', {})
+        overrides = rotation.setdefault('domains', {})
+        if scope:
+            if policy is None:
+                overrides.pop(scope, None)
+            else:
+                overrides[scope] = policy
+        else:
+            new['logrotate'] = dict(policy, domains=overrides)
+        data = checked_logrotate_data(new)
+        if op == 'save':
+            old_config = CONFIG.read_bytes()
+            old_rule = LOGROTATE_FILE.read_bytes() if LOGROTATE_FILE.exists() else None
+            try:
+                engine.atomic(LOGROTATE_FILE, data, 0o644)
+                engine.atomic(CONFIG, engine.json_bytes(new))
+            except BaseException:
+                engine.atomic(CONFIG, old_config)
+                if old_rule is None:
+                    LOGROTATE_FILE.unlink(missing_ok=True)
+                else:
+                    engine.atomic(LOGROTATE_FILE, old_rule, 0o644)
+                raise
+        return {'saved': op == 'save', 'scope': scope,
+                'revision': rotation_revision(new if op == 'save' else c)}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('action', choices=['check', 'install', 'setup', 'activate', 'freeze', 'rollback', 'deactivate', 'set-default-host', 'check-logrotate', 'install-logrotate'])
+    p.add_argument('action', choices=['check', 'install', 'setup', 'activate', 'freeze', 'rollback', 'deactivate', 'set-default-host', 'check-logrotate', 'install-logrotate', 'logrotate-api'])
     p.add_argument('--webmin-root')
     p.add_argument('--domain', default='')
     a = p.parse_args()
     if os.geteuid() != 0:
         p.error('Run as root')
+    if a.action == 'logrotate-api':
+        request = json.loads(sys.stdin.read(262145))
+        print(json.dumps(rotation_api(request), ensure_ascii=True))
+        return
     if a.action in ('check-logrotate', 'install-logrotate'):
         return configure_logrotate(apply=a.action == 'install-logrotate')
     if a.action == 'set-default-host':

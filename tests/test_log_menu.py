@@ -6,6 +6,7 @@ import unittest
 ROOT=Path(__file__).resolve().parents[1]
 PERL=r"""
 use utf8;
+use Encode ();
 use JSON::PP;
 our $admin=0;
 sub ftps_load_virtualmin {}
@@ -31,7 +32,7 @@ class LogMenu(unittest.TestCase):
         self.assertEqual({l['page'] for l in r['links']},
                          {'logs.cgi?dom=1&log=ftp','logs.cgi?dom=1&log=transfer'})
     def test_admin_keeps_inspection_link(self):
-        self.assertEqual(len(self.result(1)['links']),3)
+        self.assertEqual(len(self.result(1)['links']),4)
     def test_grants_only_active_domain_ids(self):
         r=self.result()['acl'][0]
         self.assertEqual(r[0],'virtualmin-ftps')

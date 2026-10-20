@@ -78,3 +78,7 @@ Auf Nutzerwunsch geprüfte Logrotate-Konfiguration für geschützte FTP-Logs erg
 Auf Nutzerwunsch Intervall, Archivanzahl und optionale Größenrotation als logrotate-Abschnitt in engine.json ergänzt. Neuer Standard weekly/52 ohne maxsize. Änderungen werden über geprüften install-logrotate-Aufruf übernommen; vorhandene Konfigurationen beim Paket-Update bleiben erhalten.
 
 Ergänzende Nutzeranforderung: individuelle Rotation je virtuellem FTP-Host über Domain-ID-Overrides in logrotate.domains; neue Hosts erben Standardwerte. Echte Tests prüfen getrennte Aufbewahrung ohne doppelte Rotation.
+
+## 0.1.22 Beta – Webmin-Einstellung und Kodierung
+
+Auf Nutzerwunsch native Webmin-Formulare für globale und hostbezogene Logrotation ergänzt. Screenshot zeigte FTPS pr�fen; Menüausgabe auf korrekte UTF-8-Bytes korrigiert. Hauptadministrator-ACL, POST mit sitzungsgebundenem Token, Schutz vor parallelem Überschreiben, geprüfte Regel und Wiederherstellung bei Schreibfehlern. Kein Zugriff auf den Live-Server.

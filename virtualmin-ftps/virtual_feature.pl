@@ -1,14 +1,15 @@
 use utf8;
+use Encode ();
 require 'virtualmin-ftps-lib.pl';
 
 sub feature_name { return 'FTPS VirtualHosts'; }
 sub feature_label { return 'FTPS VirtualHost'; }
 sub feature_losing { return 'Den vom FTPS-Plugin verwalteten VirtualHost entfernen'; }
-sub feature_disname { return 'FTPS-Anmeldungen für diese Domain sperren'; }
+sub feature_disname { return Encode::encode('UTF-8', 'FTPS-Anmeldungen für diese Domain sperren'); }
 sub feature_check
 {
 return 'Python 3 oder OpenSSL fehlt' if (!-x '/usr/bin/python3' || !-x '/usr/bin/openssl');
-return 'FTPS-Prüfmodus muss zuerst mit manage.py setup (Upload) oder install (Gesamtpaket) eingerichtet werden'
+return Encode::encode('UTF-8', 'FTPS-Prüfmodus muss zuerst mit manage.py setup (Upload) oder install (Gesamtpaket) eingerichtet werden')
     if (!-r '/etc/webmin/virtualmin-ftps/engine.json');
 return undef;
 }
@@ -51,8 +52,12 @@ my ($d) = @_;
 &ftps_load_virtualmin();
 my @links;
 push(@links, { mod => 'virtualmin-ftps', cat => 'server',
-               desc => 'FTPS prüfen', page => 'index.cgi?dom='.$d->{'id'} })
+               desc => Encode::encode('UTF-8', 'FTPS prüfen'), page => 'index.cgi?dom='.$d->{'id'} })
     if (&virtual_server::master_admin());
+if (&virtual_server::master_admin() && $d->{'virtualmin-ftps'}) {
+    push(@links, {mod => 'virtualmin-ftps', cat => 'logs',
+                  desc => 'FTP-Logrotation', page => 'rotation.cgi?dom='.$d->{'id'}});
+}
 if ($d->{'virtualmin-ftps'}) {
     push(@links,
          { mod => 'virtualmin-ftps', cat => 'logs', desc => 'FTP-Log',

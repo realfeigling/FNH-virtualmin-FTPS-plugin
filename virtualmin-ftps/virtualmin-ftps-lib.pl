@@ -9,6 +9,7 @@ use Cwd qw(abs_path);
 my $report_file = &module_root_directory('virtualmin-ftps').'/report-lib.pl';
 require $report_file;
 require &module_root_directory('virtualmin-ftps').'/log-ui-lib.pl';
+require &module_root_directory('virtualmin-ftps').'/rotation-ui-lib.pl';
 
 sub ftps_check_active_root
 {
